@@ -50,7 +50,7 @@ Routing is fairly similar to MVC or Web API, and is of the following pattern:
 Route example
 -------------
 ```csharp
-httpApplication.RouteTable.Add(`/{controller}/{action?}/{id?\d+}`, action = "Index"); 
+httpApplication.RouteTable.Add("/{controller}/{action?}/{id?\d+}", new { action = "Index" }); 
 ```
 
 Controllers
