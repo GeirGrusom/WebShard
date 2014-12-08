@@ -189,6 +189,23 @@ namespace UnitTests.Ioc
         }
 
         [Test]
+        public void Get_T_FromProxy_ReturnsValueForThisContainer()
+        {
+            // Arrange
+            var container = new Container();
+            var firstChildContainer = container.CreateChildContainer();
+            firstChildContainer.For<IDisposable>().Use(() => Substitute.For<IDisposable>());
+            var secondChildContainer = container.CreateChildContainer();
+            secondChildContainer.Register<DependsOnIDisposable>();
+            var proxy = secondChildContainer.CreateProxyContainer(firstChildContainer);
+
+            // Act
+            var result = proxy.Get<DependsOnIDisposable>();
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+        }
+        [Test]
         public void Get_T_NotDefined_ThrowsTypeDefinitionNotFoundException()
         {
             // Arrange

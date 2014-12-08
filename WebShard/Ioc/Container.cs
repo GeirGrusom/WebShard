@@ -38,7 +38,7 @@ namespace WebShard.Ioc
             where T : class
         {
             var results = _typeMap.Where(e => typeof(T).IsAssignableFrom(e.Key))
-                .Select(element => (T)element.Value.Get());
+                .Select(element => (T)element.Value.Get(this));
             if(recurse)
                 return results.Concat(_parent.GetAll<T>());
             return results;
@@ -47,7 +47,7 @@ namespace WebShard.Ioc
         private interface IDefinition<out T>
             where T : class
         {
-            T Get();
+            T Get(IContainer container);
         }
 
         public IContainer CreateChildContainer()
@@ -190,7 +190,7 @@ namespace WebShard.Ioc
 
         private class Definition : IDefinition<object>, IDisposable
         {
-            private readonly Func<object> _createProc;
+            private readonly Func<IContainer, object> _createProc;
             private readonly CacheLifetime _cacheLifetime;
 
             public void Dispose()
@@ -200,18 +200,18 @@ namespace WebShard.Ioc
                 
             }
 
-            protected Definition(Func<object> createProc, CacheLifetime cacheLifetime)
+            protected Definition(Func<IContainer, object> createProc, CacheLifetime cacheLifetime)
             {
                 _cacheLifetime = cacheLifetime ?? NoCacheLifetime.Instance;
                 _createProc = createProc;
             }
 
-            public object Get()
+            public object Get(IContainer container)
             {
                 var cached = _cacheLifetime.TryGetCachedValue();
                 if (cached == null)
                 {
-                    cached = _createProc();
+                    cached = _createProc(container);
                     _cacheLifetime.SetCachedObject(cached);
                 }
                 return cached;
@@ -221,15 +221,15 @@ namespace WebShard.Ioc
         private class Definition<T> : Definition, IDefinition<T> 
             where T : class
         {
-            public Definition(Func<T> createProc, CacheLifetime cacheLifetime)
+            public Definition(Func<IContainer, T> createProc, CacheLifetime cacheLifetime)
                 : base(createProc, cacheLifetime)
             {
                 
             }
 
-            public new T Get()
+            public new T Get(IContainer container)
             {
-                return (T)base.Get();
+                return (T)base.Get(container);
             }
         }
 
@@ -243,44 +243,43 @@ namespace WebShard.Ioc
                 _container = container;
             }
 
-            private Func<T> CreateFunc<T>()
+            private Func<IContainer, T> CreateFunc<T>()
             {
                 var t = typeof (T);
                 var constructor = t.GetConstructors()
                     .Select(c => new {Constructor = c, Parameters = c.GetParameters()})
                     .OrderByDescending(c => c.Parameters.Length).First();
 
-                var containerType = _container.GetType();
+                var containerType = typeof(IContainer);
                 var method = containerType.GetMethod("Get");
-
-                var func = (Func<T>)Expression.Lambda(
-                    Expression.GetFuncType(t),
+                var container = Expression.Parameter(typeof (IContainer), "container");
+                var func =Expression.Lambda<Func<IContainer, T>>(
                     Expression.New(constructor.Constructor,
                         constructor.Parameters.Select(
                             p =>
-                                Expression.Call(Expression.Constant(_container, typeof (Container)),
-                                    method.MakeGenericMethod(p.ParameterType))))).Compile();
+                                Expression.Call(container,
+                                    method.MakeGenericMethod(p.ParameterType)))), container).Compile();
 
                 return func;
             }
 
-            private Func<object> CreateFunc(Type t)
+            private Func<IContainer, object> CreateFunc(Type t)
             {
                 
                 var constructor = t.GetConstructors()
                     .Select(c => new { Constructor = c, Parameters = c.GetParameters() })
                     .OrderByDescending(c => c.Parameters.Length).First();
 
-                var containerType = _container.GetType();
+                var containerType = typeof(IContainer);
                 var method = containerType.GetMethod("Get", new Type[] {});
-
-                var func = (Func<object>)Expression.Lambda(
-                    Expression.GetFuncType(_defineFor),
+                var container = Expression.Parameter(typeof (IContainer), "container");
+                var func = (Func<IContainer, object>)Expression.Lambda(
+                    Expression.GetFuncType(typeof(IContainer), _defineFor),
                     Expression.New(constructor.Constructor,
                         constructor.Parameters.Select(
                             p =>
-                                Expression.Call(Expression.Constant(_container, typeof(Container)),
-                                    method.MakeGenericMethod(p.ParameterType))))).Compile();
+                                Expression.Call(container,
+                                    method.MakeGenericMethod(p.ParameterType)))), container).Compile();
 
                 return func;
             }
@@ -316,7 +315,7 @@ namespace WebShard.Ioc
             public void Use<T>(Func<T> proc, Lifetime cacheLifetime = Lifetime.None)
                 where T : class
             {
-                _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(proc, CreateLifetime(cacheLifetime)), (a, b) => new Definition<T>(proc, CreateLifetime(cacheLifetime)));
+                _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(cont => proc(), CreateLifetime(cacheLifetime)), (a, b) => new Definition<T>(c => proc(), CreateLifetime(cacheLifetime)));
             }
         }
 
@@ -325,7 +324,7 @@ namespace WebShard.Ioc
             Definition def;
             if (_typeMap.TryGetValue(serviceType, out def))
             {
-                return def.Get();
+                return def.Get(this);
             }
             if (_parent != null)
                 return _parent.GetService(serviceType);
@@ -337,7 +336,7 @@ namespace WebShard.Ioc
             var v = _typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
             if (v.Value != null)
             {
-                return v.Value.Get();
+                return v.Value.Get(this);
             }
 
             if (_parent != null)
@@ -351,7 +350,7 @@ namespace WebShard.Ioc
             var v = _typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
             if (v.Value != null)
             {
-                return v.Value.Get();
+                return v.Value.Get(this);
             }
 
             if (_parent != null)
@@ -365,7 +364,7 @@ namespace WebShard.Ioc
             Definition def;
             if (_typeMap.TryGetValue(typeof (T), out def))
             {
-                return ((Definition<T>) def).Get();
+                return ((Definition<T>) def).Get(this);
             }
             if (_parent != null)
                 return _parent.Get<T>();
@@ -378,7 +377,7 @@ namespace WebShard.Ioc
             Definition def;
             if(_typeMap.TryGetValue(typeof(T), out def))
             {
-                return ((Definition<T>) def).Get();
+                return ((Definition<T>) def).Get(this);
             }
             if(_parent != null)
                 return _parent.TryGet<T>();
