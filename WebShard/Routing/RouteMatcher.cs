@@ -65,6 +65,10 @@ namespace WebShard.Routing
                         routeValues[seg] = def;
                 }
             }
+            foreach (var item in _defaults.Where(r => !_segments.Contains(r.Key)))
+            {
+                routeValues.Add(item.Key, item.Value);
+            }
 
             return true;
         }

@@ -39,7 +39,7 @@ namespace WebShard
             var app = new HttpApplication();
 
             app.ControllerRegistry.Register<TestController>();
-            app.RouteTable.Add("/{controller?}", new { controller = "Test" });          
+            app.RouteTable.Add("/", new { controller = "Test" });          
 
             var server = new HttpWebServer(app);
 
