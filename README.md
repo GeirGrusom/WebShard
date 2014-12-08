@@ -101,4 +101,6 @@ static class Program
 Known issues
 ============
 
-There is currently some issues with the IoC container closing itself when it really shouldn't.
+* There is currently some issues with the IoC container closing itself when it really shouldn't.
+* POST data is not deserialized, so currently POST doesn't work unless the controller does
+  all the hard work.
