@@ -102,5 +102,6 @@ Known issues
 ============
 
 * There is currently some issues with the IoC container closing itself when it really shouldn't.
+* Due to the closing issue, IHttpRequestContext is not available (as it should) through DI.
 * POST data is not deserialized, so currently POST doesn't work unless the controller does
   all the hard work.
