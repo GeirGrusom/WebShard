@@ -29,6 +29,20 @@ namespace UnitTests.Routing
         }
 
         [Test]
+        public void Match_AddsMissingRouteValues()
+        {
+            // Arrange
+            var route = new Route(null, "/", new {controller = "Home"});
+            var matcher = new RouteMatcher(route);
+            IDictionary<string, string> routeValues;
+            // Act
+            matcher.Match("/", out routeValues);
+
+            // Assert
+            Assert.That(routeValues.ContainsKey("controller"), Is.True);
+        }
+
+        [Test]
         public void Match_ReturnsValues()
         {
             var route = new Route(null, "foo/{controller}/{action}", new {controller = "Default", action = "foo"});
