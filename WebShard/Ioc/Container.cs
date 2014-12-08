@@ -3,19 +3,23 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Linq;
 using System.Linq.Expressions;
-using System.Reflection;
-using System.Text;
 using System.Threading;
-using System.Threading.Tasks;
 
 namespace WebShard.Ioc
 {
-    
     public sealed class Container : IContainer
     {
-        private readonly ConcurrentDictionary<Type, Definition> typeMap;
+        private readonly ConcurrentDictionary<Type, Definition> _typeMap;
         private readonly IContainer _parent;
         private bool _isDisposed;
+
+        
+
+        private Container(IContainer parent, ConcurrentDictionary<Type, Definition> typeMap)
+        {
+            _parent = parent;
+            _typeMap = typeMap;
+        }
 
         private Container(IContainer parent)
             : this()
@@ -25,10 +29,20 @@ namespace WebShard.Ioc
 
         public Container()
         {
-            typeMap = new ConcurrentDictionary<Type, Definition>();
+            _typeMap = new ConcurrentDictionary<Type, Definition>();
         }
 
         public IContainer Parent { get { return _parent; } }
+
+        public IEnumerable<T> GetAll<T>(bool recurse = true)
+            where T : class
+        {
+            var results = _typeMap.Where(e => typeof(T).IsAssignableFrom(e.Key))
+                .Select(element => (T)element.Value.Get());
+            if(recurse)
+                return results.Concat(_parent.GetAll<T>());
+            return results;
+        }
 
         private interface IDefinition<out T>
             where T : class
@@ -41,12 +55,23 @@ namespace WebShard.Ioc
             return new Container(this);
         }
 
+        /// <summary>
+        /// Creates a proxy with a different parent.
+        /// </summary>
+        /// <param name="parent"></param>
+        /// <returns></returns>
+        public IContainer CreateProxyContainer(IContainer parent)
+        {
+            return new Container(parent, _typeMap);
+        }
+
+
         public void Dispose()
         {
             if (_isDisposed)
                 return;
             _isDisposed = true;
-            foreach (var item in this.typeMap)
+            foreach (var item in _typeMap)
             {
                 item.Value.Dispose();
             }
@@ -54,14 +79,7 @@ namespace WebShard.Ioc
 
         private abstract class CacheLifetime : IDisposable
         {
-            protected readonly IContainer Container;
-
             protected object CachedValue;
-
-            protected CacheLifetime(IContainer container)
-            {
-                Container = container;
-            }
 
             public abstract bool HasCacheExpired();
 
@@ -71,6 +89,7 @@ namespace WebShard.Ioc
             {
                 if(CachedValue is IDisposable)
                     ((IDisposable)CachedValue).Dispose();
+                CachedValue = null;
             }
 
             public virtual object GetCachedValue()
@@ -88,34 +107,34 @@ namespace WebShard.Ioc
 
         private sealed class ThreadCacheLifetime : CacheLifetime
         {
-            private readonly ConcurrentDictionary<Thread, object> objectStore;
+            private readonly ConcurrentDictionary<Thread, object> _objectStore;
 
-            public ThreadCacheLifetime(IContainer container)
-                : base(container)
+            public ThreadCacheLifetime()
             {
-                objectStore = new ConcurrentDictionary<Thread, object>();
+                _objectStore = new ConcurrentDictionary<Thread, object>();
             }
 
             public override void Dispose()
             {
-                foreach (var item in objectStore.Select(i => i.Value).OfType<IDisposable>())
+                foreach (var item in _objectStore.Select(i => i.Value).OfType<IDisposable>())
                 {
                     item.Dispose();
                 }
+                _objectStore.Clear();
             }
 
             public override bool HasCacheExpired()
             {
                 // Clean up threads.
-                var deadThreads = objectStore.Keys.Where(k => !k.IsAlive);
+                var deadThreads = _objectStore.Keys.Where(k => !k.IsAlive);
                 foreach (var thread in deadThreads)
                 {
                     object value;
-                    objectStore.TryRemove(thread, out value);
+                    _objectStore.TryRemove(thread, out value);
                 }
 
                 object result;
-                objectStore.TryGetValue(Thread.CurrentThread, out result);
+                _objectStore.TryGetValue(Thread.CurrentThread, out result);
 
                 return result == null;
             }
@@ -123,24 +142,18 @@ namespace WebShard.Ioc
             public override object GetCachedValue()
             {
                 object result;
-                objectStore.TryGetValue(Thread.CurrentThread, out result);
+                _objectStore.TryGetValue(Thread.CurrentThread, out result);
                 return result;
             }
 
             public override void SetCachedObject(object value)
             {
-                objectStore.TryAdd(Thread.CurrentThread,  value);
+                _objectStore.TryAdd(Thread.CurrentThread,  value);
             }
         }
 
         private sealed class ApplicationCacheLifetime : CacheLifetime
         {
-            public ApplicationCacheLifetime()
-                : base(null)
-            {
-                
-            }
-
             public override bool HasCacheExpired()
             {
                 return false;
@@ -156,8 +169,7 @@ namespace WebShard.Ioc
         {
             public static readonly CacheLifetime Instance = new NoCacheLifetime();
 
-            public NoCacheLifetime()
-                : base(null)
+            private NoCacheLifetime()
             {
             }
 
@@ -188,10 +200,10 @@ namespace WebShard.Ioc
                 
             }
 
-            public Definition(Func<object> createProc, CacheLifetime cacheLifetime)
+            protected Definition(Func<object> createProc, CacheLifetime cacheLifetime)
             {
-                this._cacheLifetime = cacheLifetime ?? NoCacheLifetime.Instance;
-                this._createProc = createProc;
+                _cacheLifetime = cacheLifetime ?? NoCacheLifetime.Instance;
+                _createProc = createProc;
             }
 
             public object Get()
@@ -284,7 +296,7 @@ namespace WebShard.Ioc
                     /*case Lifetime.Request:
                         return new RequestCacheLifetime(_container);*/
                     case Lifetime.Thread:
-                        return new ThreadCacheLifetime(_container);
+                        return new ThreadCacheLifetime();
                     default:
                         throw new ArgumentException("Lifetime must be one of the defined values.");
                 }
@@ -292,7 +304,7 @@ namespace WebShard.Ioc
 
             public void Use(Type type, Lifetime cacheLifetime = Lifetime.None)
             {
-                _container.typeMap.AddOrUpdate(_defineFor, t => (Definition)Activator.CreateInstance(typeof(Definition<>).MakeGenericType(_defineFor), CreateFunc(type), CreateLifetime(cacheLifetime)), (a, b) => { throw new Exception(); });
+                _container._typeMap.AddOrUpdate(_defineFor, t => (Definition)Activator.CreateInstance(typeof(Definition<>).MakeGenericType(_defineFor), CreateFunc(type), CreateLifetime(cacheLifetime)), (a, b) => { throw new Exception(); });
             }
 
             public void Use<T>(Lifetime cacheLifetime = Lifetime.None)
@@ -304,14 +316,14 @@ namespace WebShard.Ioc
             public void Use<T>(Func<T> proc, Lifetime cacheLifetime = Lifetime.None)
                 where T : class
             {
-                _container.typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(proc, CreateLifetime(cacheLifetime)), (a, b) => new Definition<T>(proc, CreateLifetime(cacheLifetime)));
+                _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(proc, CreateLifetime(cacheLifetime)), (a, b) => new Definition<T>(proc, CreateLifetime(cacheLifetime)));
             }
         }
 
         public object GetService(Type serviceType)
         {
             Definition def;
-            if (typeMap.TryGetValue(serviceType, out def))
+            if (_typeMap.TryGetValue(serviceType, out def))
             {
                 return def.Get();
             }
@@ -322,7 +334,7 @@ namespace WebShard.Ioc
 
         public object Get(string name)
         {
-            var v = typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
+            var v = _typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
             if (v.Value != null)
             {
                 return v.Value.Get();
@@ -336,7 +348,7 @@ namespace WebShard.Ioc
 
         public object TryGet(string name)
         {
-            var v = typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
+            var v = _typeMap.FirstOrDefault(x => string.Equals(x.Key.Name, name, StringComparison.OrdinalIgnoreCase));
             if (v.Value != null)
             {
                 return v.Value.Get();
@@ -351,7 +363,7 @@ namespace WebShard.Ioc
         public T Get<T>() where T : class
         {
             Definition def;
-            if (typeMap.TryGetValue(typeof (T), out def))
+            if (_typeMap.TryGetValue(typeof (T), out def))
             {
                 return ((Definition<T>) def).Get();
             }
@@ -364,7 +376,7 @@ namespace WebShard.Ioc
             where T : class
         {
             Definition def;
-            if(typeMap.TryGetValue(typeof(T), out def))
+            if(_typeMap.TryGetValue(typeof(T), out def))
             {
                 return ((Definition<T>) def).Get();
             }

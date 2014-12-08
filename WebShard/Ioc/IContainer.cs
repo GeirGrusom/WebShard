@@ -55,6 +55,9 @@ namespace WebShard.Ioc
 
     public interface IContainer : IServiceProvider, IDisposable
     {
+        IEnumerable<T> GetAll<T>(bool recurse = true)
+            where T : class;
+
         T Get<T>()
             where T : class;
 
@@ -73,5 +76,7 @@ namespace WebShard.Ioc
         IContainer Parent { get; }
 
         IContainer CreateChildContainer();
+
+        IContainer CreateProxyContainer(IContainer parent);
     }
 }

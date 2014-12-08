@@ -24,7 +24,7 @@ namespace WebShard.Routing
                 {
                     _segments.Add(e.Groups["Name"].Value);
                     return "((?<" + e.Groups["Name"] + ">" +
-                           (e.Groups["Regex"].Success ? e.Groups["Regex"].Value : "[^/]*") + (e.Groups["Slash"].Success ? ")/)" : "))") +
+                           (e.Groups["Regex"].Success ? e.Groups["Regex"].Value : "[^/]+") + (e.Groups["Slash"].Success ? ")/)" : "))") +
                            (e.Groups["Optional"].Success ? "?" : "");
                 });
             return new Regex(reg, RegexOptions.Compiled | RegexOptions.Singleline);

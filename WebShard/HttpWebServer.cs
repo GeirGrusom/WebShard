@@ -14,17 +14,23 @@ namespace WebShard
 
         public IHttpApplication Application { get { return _application; } }
 
-        public HttpWebServer(int httpPort, int httpsPort, IHttpApplication application)
+        public HttpWebServer(IHttpApplication application, int httpPort = 80, int httpsPort = 443, WebServerFlags startupFlags = WebServerFlags.HttpOverIpv4 | WebServerFlags.HttpOverIpv6)
         {
             _application = application;
             _cancel = new CancellationTokenSource();
-            _listeners = new List<Listener>
-            {
-                new Ip4Listener(httpPort, false, this, _cancel.Token),
-                new Ip4Listener(httpsPort, true, this, _cancel.Token),
-                new Ip6Listener(httpPort, false, this, _cancel.Token),
-                new Ip6Listener(httpsPort, true, this, _cancel.Token)
-            };
+            _listeners = new List<Listener>();
+
+            if ((WebServerFlags.HttpOverIpv4) == (startupFlags & (WebServerFlags.HttpOverIpv4)))
+                _listeners.Add(new Ip4Listener(httpPort, false, this, _cancel.Token));
+
+            if ((WebServerFlags.HttpsOverIpv4) == (startupFlags & (WebServerFlags.HttpsOverIpv4)))
+                _listeners.Add(new Ip4Listener(httpsPort, true, this, _cancel.Token));
+
+            if ((WebServerFlags.HttpOverIpv6) == (startupFlags & (WebServerFlags.HttpOverIpv6)))
+                _listeners.Add(new Ip6Listener(httpPort, false, this, _cancel.Token));
+
+            if ((WebServerFlags.HttpsOverIpv6) == (startupFlags & (WebServerFlags.HttpsOverIpv6)))
+                _listeners.Add(new Ip6Listener(httpsPort, true, this, _cancel.Token));
         }
 
         public void Start()
@@ -52,10 +58,6 @@ namespace WebShard
         {
             if(RequestException != null)
                 RequestException(this, new RequestExceptionEventArgs(context, ex));
-        }
-
-        public void ProcessRequest(IHttpRequestContext request)
-        {
         }
 
         public event EventHandler<IHttpRequestContext> BeginRequest;

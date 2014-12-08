@@ -4,6 +4,7 @@
     {
         public static readonly StatusResponse NotFound = new StatusResponse(Status.NotFound);
         public static readonly StatusResponse BadRequest = new StatusResponse(Status.BadRequest);
+        public static readonly StatusResponse Unauthorized = new StatusResponse(Status.Unauthorized);
 
         private readonly Status _status;
         public Status Status { get { return _status; } }
