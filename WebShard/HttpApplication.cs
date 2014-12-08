@@ -55,6 +55,10 @@ namespace WebShard
             IDictionary<string, string> routeValues;
             var route = _routeTable.Match(SanitizePathAndQueryAndReturnPath(requestContext.Uri.PathAndQuery), out routeValues);
 
+            var keepAlive = requestContext.Headers.Connection == "keep-alive";
+
+            response.Headers.Connection = keepAlive ? "keep-alive" : "close";
+
             if (route == null) // No route was matched.
             {
                 StatusResponse.NotFound.Write(requestContext, response);

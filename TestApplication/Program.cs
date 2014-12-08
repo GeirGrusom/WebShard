@@ -1,5 +1,6 @@
 ﻿using WebShard.Filtering;
 using WebShard.Ioc;
+using WebShard.Routing;
 
 namespace WebShard
 {
@@ -29,7 +30,7 @@ namespace WebShard
             var app = new HttpApplication();
 
             app.ControllerRegistry.Register<TestController>();
-            app.RouteTable.Add("/{controller?}", new { controller = "Test" });
+            app.RouteTable.Add("/{controller?}", new { controller = "Test" });          
 
             var server = new HttpWebServer(app);
 

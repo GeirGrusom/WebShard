@@ -25,6 +25,7 @@ namespace WebShard.Mvc
             _methodLookup = methodNames.ToDictionary(x => x, x => 
                 _methods.Where(m => string.Equals(x, m.Name, StringComparison.OrdinalIgnoreCase)).ToArray(), StringComparer.OrdinalIgnoreCase);
         }
+
         public IResponse Invoke(object controller, IDictionary<string, string> routeValues)
         {
             var methods = _methodLookup[routeValues["action"]];

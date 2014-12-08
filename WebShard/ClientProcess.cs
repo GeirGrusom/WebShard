@@ -70,7 +70,7 @@ namespace WebShard
                     var response = _webServer.Application.ProcessRequest(request);
                     response.WriteResponse(stream);
                     stream.Flush();
-                    if (request.Headers.Connection != "keep-alive")
+                    if (response.Headers.Connection != "keep-alive")
                         break;
                 }
             }
