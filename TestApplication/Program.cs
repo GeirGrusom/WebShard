@@ -6,7 +6,6 @@ namespace WebShard
 {
     public class TestController
     {
-
         private readonly IHttpRequestContext _request;
 
         public TestController(IHttpRequestContext request)
@@ -38,6 +37,8 @@ namespace WebShard
         {
             var app = new HttpApplication();
 
+            app.FilterRegistry.Register(() => new PasswordCredentials("foo", "bar"));
+            app.FilterRegistry.Register<BasicAuthorizationFilter>();
             app.ControllerRegistry.Register<TestController>();
             app.RouteTable.Add("/", new { controller = "Test" });          
 

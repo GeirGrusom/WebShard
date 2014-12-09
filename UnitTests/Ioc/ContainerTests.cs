@@ -25,10 +25,10 @@ namespace UnitTests.Ioc
         {
             // Arrange
             var container = new Container();
-            var value = Substitute.For<ICloneable>();
 
             ICloneable otherThreadValue = null;
             container.For<ICloneable>().Use<Clonable>(Lifetime.Thread);
+            var value = container.Get<ICloneable>();
 
             var otherThread = new Thread(() => otherThreadValue = container.Get<ICloneable>());
             otherThread.Start();
@@ -205,6 +205,7 @@ namespace UnitTests.Ioc
             // Assert
             Assert.That(result, Is.Not.Null);
         }
+
         [Test]
         public void Get_T_NotDefined_ThrowsTypeDefinitionNotFoundException()
         {

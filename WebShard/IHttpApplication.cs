@@ -9,7 +9,5 @@ namespace WebShard
         IContainer Container { get; }
         IRouteTable RouteTable { get; }
         IHttpResponseContext ProcessRequest(IHttpRequestContext requestContext);
-
-        event EventHandler<IContainer> ConfigureRequest; 
     }
 }

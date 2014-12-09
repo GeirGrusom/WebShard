@@ -10,15 +10,18 @@ namespace WebShard.Ioc
     public sealed class Container : IContainer
     {
         private readonly ConcurrentDictionary<Type, Definition> _typeMap;
+        private readonly ConcurrentDictionary<Type, Definition> _requestTypeMap; // Contains a copy of all definitons with a Request lifetime. 
+        private readonly ConcurrentDictionary<Type, object> _cache; 
         private readonly IContainer _parent;
-        private bool _isDisposed;
 
-        
+        private bool _isDisposed;
 
         private Container(IContainer parent, ConcurrentDictionary<Type, Definition> typeMap)
         {
             _parent = parent;
             _typeMap = typeMap;
+            _requestTypeMap = new ConcurrentDictionary<Type, Definition>();
+            _cache = new ConcurrentDictionary<Type, object>();
         }
 
         private Container(IContainer parent)
@@ -29,6 +32,8 @@ namespace WebShard.Ioc
 
         public Container()
         {
+            _requestTypeMap = new ConcurrentDictionary<Type, Definition>();
+            _cache = new ConcurrentDictionary<Type, object>();
             _typeMap = new ConcurrentDictionary<Type, Definition>();
         }
 
@@ -65,6 +70,11 @@ namespace WebShard.Ioc
             return new Container(parent, _typeMap);
         }
 
+        public IContainer CreateRequestChildContainer()
+        {
+            return new Container(this, _requestTypeMap);
+        }
+
 
         public void Dispose()
         {
@@ -73,35 +83,79 @@ namespace WebShard.Ioc
             _isDisposed = true;
             foreach (var item in _typeMap)
             {
-                item.Value.Dispose();
+                item.Value.Dispose(this);
             }
         }
 
         private abstract class CacheLifetime : IDisposable
         {
-            protected object CachedValue;
+            protected readonly Type Key;
+            private object _cachedValue;
 
-            public abstract bool HasCacheExpired();
+            protected CacheLifetime(Type key)
+            {
+                Key = key;
+            }
 
-            public abstract void SetCachedObject(object value);
+            public abstract bool HasCacheExpired(IContainer container);
+
+            public virtual void Dispose(IContainer container)
+            {
+                var c = container as Container;
+                if (c != null)
+                {
+                    object value;
+                    if (c._cache.TryRemove(Key, out value))
+                    {
+                        var disposable = value as IDisposable;
+                        if (disposable != null)
+                            disposable.Dispose();
+                    }
+                }
+            }
+
+            public virtual void SetCachedObject(IContainer container, object value)
+            {
+                var c = container as Container;
+                if (c != null)
+                {
+                    c._cache.AddOrUpdate(Key,
+                        t => value,
+                        (t, o) =>
+                        {
+                            var disposable = o as IDisposable;
+                            if (disposable != null && !ReferenceEquals(disposable, value))
+                                disposable.Dispose();
+                            return value;
+                        });
+                }
+                _cachedValue = value;
+            }
 
             public virtual void Dispose()
             {
-                if(CachedValue is IDisposable)
-                    ((IDisposable)CachedValue).Dispose();
-                CachedValue = null;
+                if(_cachedValue is IDisposable)
+                    ((IDisposable)_cachedValue).Dispose();
+                _cachedValue = null;
             }
 
-            public virtual object GetCachedValue()
+            public virtual object GetCachedValue(IContainer container)
             {
-                return CachedValue;
+                var c = container as Container;
+                if (c != null)
+                {
+                    object result;
+                    c._cache.TryGetValue(Key, out result);
+                    return result;
+                }
+                return _cachedValue;
             }
 
-            public object TryGetCachedValue()
+            public object TryGetCachedValue(IContainer container)
             {
-                if (HasCacheExpired())
+                if (HasCacheExpired(container))
                     return null;
-                return GetCachedValue();
+                return GetCachedValue(container);
             }
         }
 
@@ -109,67 +163,122 @@ namespace WebShard.Ioc
         {
             private readonly ConcurrentDictionary<Thread, object> _objectStore;
 
-            public ThreadCacheLifetime()
+            public ThreadCacheLifetime(Type key)
+                : base(key)
             {
                 _objectStore = new ConcurrentDictionary<Thread, object>();
             }
 
-            public override void Dispose()
+            public override void Dispose(IContainer container)
             {
-                foreach (var item in _objectStore.Select(i => i.Value).OfType<IDisposable>())
+                ConcurrentDictionary<Thread, object> objectStore;
+                var c = container as Container;
+                if (c != null)
+                {
+                    objectStore =
+                        (ConcurrentDictionary<Thread, object>)
+                            c._cache.GetOrAdd(Key, t => new ConcurrentDictionary<Thread, object>());
+                }
+                else
+                {
+                    objectStore = _objectStore;
+                }
+
+                foreach (var item in objectStore.Select(i => i.Value).OfType<IDisposable>())
                 {
                     item.Dispose();
                 }
                 _objectStore.Clear();
             }
 
-            public override bool HasCacheExpired()
+            public override bool HasCacheExpired(IContainer container)
             {
                 // Clean up threads.
-                var deadThreads = _objectStore.Keys.Where(k => !k.IsAlive);
+                var objectStore = container is Container ? (ConcurrentDictionary<Thread, object>)base.GetCachedValue(container) : _objectStore;
+
+                if (objectStore == null)
+                    return true;
+
+                var deadThreads = objectStore.Keys.Where(k => !k.IsAlive);
                 foreach (var thread in deadThreads)
                 {
                     object value;
-                    _objectStore.TryRemove(thread, out value);
+                    objectStore.TryRemove(thread, out value);
                 }
 
                 object result;
-                _objectStore.TryGetValue(Thread.CurrentThread, out result);
+                objectStore.TryGetValue(Thread.CurrentThread, out result);
 
                 return result == null;
             }
 
-            public override object GetCachedValue()
+            public override object GetCachedValue(IContainer container)
             {
+                var objectStore = (ConcurrentDictionary<Thread, object>)base.GetCachedValue(container);
+                if (objectStore == null)
+                    return null;
                 object result;
-                _objectStore.TryGetValue(Thread.CurrentThread, out result);
+                objectStore.TryGetValue(Thread.CurrentThread, out result);
                 return result;
             }
 
-            public override void SetCachedObject(object value)
+            public override void SetCachedObject(IContainer container, object value)
             {
-                _objectStore.TryAdd(Thread.CurrentThread,  value);
+                ConcurrentDictionary<Thread, object> objectStore;
+                var c = container as Container;
+                if (c != null)
+                {
+                    objectStore =
+                        (ConcurrentDictionary<Thread, object>)
+                            c._cache.GetOrAdd(Key, t => new ConcurrentDictionary<Thread, object>());
+                }
+                else
+                {
+                    objectStore = _objectStore;
+                }
+
+                objectStore.AddOrUpdate(Thread.CurrentThread, t => value, (t, o) =>
+                {
+                    var disposable = o as IDisposable;
+                    if (disposable != null)
+                        disposable.Dispose();
+                    return value;
+                });
             }
         }
 
         private sealed class ApplicationCacheLifetime : CacheLifetime
         {
-            public override bool HasCacheExpired()
+            public ApplicationCacheLifetime(Type key)
+                : base(key)
+            {
+            }
+
+            public override bool HasCacheExpired(IContainer container)
             {
                 return false;
             }
+        }
 
-            public override void SetCachedObject(object value)
+        private sealed class RequestCacheLifetime : CacheLifetime
+        {
+            public RequestCacheLifetime(Type key)
+                : base(key)
             {
-                CachedValue = value;
+            }
+
+            public override bool HasCacheExpired(IContainer container)
+            {
+                return false;
             }
         }
 
         private sealed class NoCacheLifetime : CacheLifetime
         {
-            public static readonly CacheLifetime Instance = new NoCacheLifetime();
+            public static readonly CacheLifetime Instance = new NoCacheLifetime(null);
 
-            private NoCacheLifetime()
+            private NoCacheLifetime(Type key)
+                : base(key)
             {
             }
 
@@ -177,26 +286,25 @@ namespace WebShard.Ioc
             {
             }
 
-            public override bool HasCacheExpired()
+            public override bool HasCacheExpired(IContainer container)
             {
                 return true;
             }
 
-            public override void SetCachedObject(object value)
+            public override void SetCachedObject(IContainer container, object value)
             {
                 
             }
         }
 
-        private class Definition : IDefinition<object>, IDisposable
+        private class Definition : IDefinition<object>
         {
             private readonly Func<IContainer, object> _createProc;
             private readonly CacheLifetime _cacheLifetime;
-
-            public void Dispose()
+            public void Dispose(IContainer container)
             {
                 if (_cacheLifetime != null)
-                    _cacheLifetime.Dispose();
+                    _cacheLifetime.Dispose(container);
                 
             }
 
@@ -208,11 +316,11 @@ namespace WebShard.Ioc
 
             public object Get(IContainer container)
             {
-                var cached = _cacheLifetime.TryGetCachedValue();
+                var cached = _cacheLifetime.TryGetCachedValue(container);
                 if (cached == null)
                 {
                     cached = _createProc(container);
-                    _cacheLifetime.SetCachedObject(cached);
+                    _cacheLifetime.SetCachedObject(container, cached);
                 }
                 return cached;
             }
@@ -284,18 +392,18 @@ namespace WebShard.Ioc
                 return func;
             }
 
-            private CacheLifetime CreateLifetime(Lifetime lf)
+            private CacheLifetime CreateLifetime(Type key, Lifetime lf)
             {
                 switch (lf)
                 {
                     case Lifetime.None:
                         return NoCacheLifetime.Instance;
                     case Lifetime.Application:
-                        return new ApplicationCacheLifetime();
-                    /*case Lifetime.Request:
-                        return new RequestCacheLifetime(_container);*/
+                        return new ApplicationCacheLifetime(key);
+                    case Lifetime.Request:
+                        return new RequestCacheLifetime(key);
                     case Lifetime.Thread:
-                        return new ThreadCacheLifetime();
+                        return new ThreadCacheLifetime(key);
                     default:
                         throw new ArgumentException("Lifetime must be one of the defined values.");
                 }
@@ -303,7 +411,11 @@ namespace WebShard.Ioc
 
             public void Use(Type type, Lifetime cacheLifetime = Lifetime.None)
             {
-                _container._typeMap.AddOrUpdate(_defineFor, t => (Definition)Activator.CreateInstance(typeof(Definition<>).MakeGenericType(_defineFor), CreateFunc(type), CreateLifetime(cacheLifetime)), (a, b) => { throw new Exception(); });
+                var def = _container._typeMap.AddOrUpdate(_defineFor, t => (Definition)Activator.CreateInstance(typeof(Definition<>).MakeGenericType(_defineFor), CreateFunc(type), CreateLifetime(_defineFor, cacheLifetime)), (a, b) => { throw new Exception(); });
+                if (cacheLifetime == Lifetime.Request)
+                {
+                    _container._requestTypeMap.AddOrUpdate(type, def, (t, d) => def);
+                }
             }
 
             public void Use<T>(Lifetime cacheLifetime = Lifetime.None)
@@ -315,7 +427,11 @@ namespace WebShard.Ioc
             public void Use<T>(Func<T> proc, Lifetime cacheLifetime = Lifetime.None)
                 where T : class
             {
-                _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(cont => proc(), CreateLifetime(cacheLifetime)), (a, b) => new Definition<T>(c => proc(), CreateLifetime(cacheLifetime)));
+                var def = _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(cont => proc(), CreateLifetime(_defineFor, cacheLifetime)), (a, b) => new Definition<T>(c => proc(), CreateLifetime(_defineFor, cacheLifetime)));
+                if (cacheLifetime == Lifetime.Request)
+                {
+                    _container._requestTypeMap.AddOrUpdate(_defineFor, def, (t, d) => def);
+                }
             }
         }
 

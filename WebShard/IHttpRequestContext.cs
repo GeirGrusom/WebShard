@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.IO;
 
 namespace WebShard
@@ -11,6 +12,7 @@ namespace WebShard
 
     public interface IHttpRequestContext
     {
+        IDictionary<string, string> QueryString { get; } 
         string ProtocolVersion { get; }
         string Method { get; }
         Uri Uri { get; }

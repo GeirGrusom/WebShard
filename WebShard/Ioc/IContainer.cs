@@ -1,8 +1,5 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace WebShard.Ioc
 {
@@ -21,7 +18,14 @@ namespace WebShard.Ioc
         /// <summary>
         /// The container will create one instance for the calling thread.
         /// </summary>
-        Thread
+        Thread,
+
+        /// <summary>
+        /// Defines that the cache object will live as long as the request.
+        /// </summary>
+        /// <remarks>
+        /// Note that this is functionally the same as <see cref="Lifetime.Application"/> for a single container.</remarks>
+        Request,
     }
     public interface IDefineType
     {
@@ -76,6 +80,8 @@ namespace WebShard.Ioc
         IContainer Parent { get; }
 
         IContainer CreateChildContainer();
+
+        IContainer CreateRequestChildContainer();
 
         IContainer CreateProxyContainer(IContainer parent);
     }

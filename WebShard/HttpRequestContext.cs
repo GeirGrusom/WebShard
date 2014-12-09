@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -7,12 +9,19 @@ namespace WebShard
 {
     public class HttpRequestContext : IHttpRequestContext
     {
+        private static readonly Regex KeyValueRegex = new Regex("(?<Key>[^&=]+)=(?<Value>[^&=]*)", RegexOptions.Compiled | RegexOptions.Singleline);
+        private static IDictionary<string, string> ParseQueryString(string queryString)
+        {
+            var m = KeyValueRegex.Matches(queryString.TrimStart('?')).Cast<Match>();
+            return m.ToDictionary(k => System.Net.WebUtility.UrlDecode(k.Groups["Key"].Value), k => System.Net.WebUtility.UrlDecode(k.Groups["Value"].Value));
+        }
         private readonly string _protocolVersion;
         private readonly string _method;
         private readonly Uri _uri;
         private readonly string _remoteAddress;
         private readonly HeaderCollection _headerCollection;
         private readonly Stream _bodyStream;
+        private readonly IDictionary<string, string> _queryString; 
 
         public string ProtocolVersion { get { return _protocolVersion; } }
         public string Method { get { return _method; } }
@@ -20,6 +29,7 @@ namespace WebShard
         public string RemoteAddress { get { return _remoteAddress; } }
         public HeaderCollection Headers { get { return _headerCollection; } }
         public Stream Body { get { return _bodyStream; } }
+        public IDictionary<string, string> QueryString { get { return _queryString; } } 
 
         private HttpRequestContext(string method, Uri uri, string protocolVersion, string remoteAddress, HeaderCollection headers,
             Stream body)
@@ -30,6 +40,7 @@ namespace WebShard
             _remoteAddress = remoteAddress;
             _headerCollection = headers;
             _bodyStream = body;
+            _queryString = ParseQueryString(uri.Query);
         }
         
         private static readonly Regex headerRegex = new Regex(@"(?<Name>[a-zA-Z\-]+)\s*:\s*(?<Value>.+)", RegexOptions.Compiled | RegexOptions.Singleline);
