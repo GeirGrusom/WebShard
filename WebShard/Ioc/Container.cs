@@ -414,7 +414,7 @@ namespace WebShard.Ioc
                 var def = _container._typeMap.AddOrUpdate(_defineFor, t => (Definition)Activator.CreateInstance(typeof(Definition<>).MakeGenericType(_defineFor), CreateFunc(type), CreateLifetime(_defineFor, cacheLifetime)), (a, b) => { throw new Exception(); });
                 if (cacheLifetime == Lifetime.Request)
                 {
-                    _container._requestTypeMap.AddOrUpdate(type, def, (t, d) => def);
+                    _container._requestTypeMap.AddOrUpdate(_defineFor, def, (t, d) => def);
                 }
             }
 

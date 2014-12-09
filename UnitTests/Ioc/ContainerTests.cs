@@ -124,7 +124,41 @@ namespace UnitTests.Ioc
             Assert.That(b, Is.Not.Null);
             Assert.That(a, Is.Not.EqualTo(b));
         }
-        
+
+        [Test]
+        public void GetRequestChildContainer_ReturnsRequestCacheValue()
+        {
+            // Arrange
+            var container = new Container();
+            container.For<ICloneable>().Use<Clonable>(Lifetime.Request);
+            var requestContainer = container.CreateRequestChildContainer();
+
+            // Act
+            var a = container.Get<ICloneable>();
+            var b = requestContainer.Get<ICloneable>();
+            var c = requestContainer.Get<ICloneable>();
+
+            // Assert
+            Assert.That(a, Is.Not.SameAs(b));
+            Assert.That(b, Is.SameAs(c));
+        }
+
+        [Test]
+        public void GetRequestChildContainer_NonRequestDefinition_ReturnsSuperContainersCacheValue()
+        {
+            // Arrange
+            var container = new Container();
+            container.For<ICloneable>().Use<Clonable>(Lifetime.Application);
+            var requestContainer = container.CreateRequestChildContainer();
+
+            // Act
+            var a = container.Get<ICloneable>();
+            var b = requestContainer.Get<ICloneable>();
+
+            // Assert
+            Assert.That(a, Is.SameAs(b));
+        }
+
         [Test]
         public void Registers_ApplicationLifetime_ReturnsTheSameInstance_Twice()
         {
