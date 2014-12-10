@@ -81,7 +81,7 @@ namespace UnitTests.Ioc
             // Arrange
             var value = Substitute.For<ICloneable>();
             var container = new Container();
-            container.For<ICloneable>().Use(() => value);
+            container.For<ICloneable>().Use(c => value);
 
             // Act
             var result = container.Get<ICloneable>();
@@ -181,7 +181,7 @@ namespace UnitTests.Ioc
             var obj = Substitute.For<IDisposable>();
             var container = new Container();
 
-            container.For<IDisposable>().Use(() => obj, Lifetime.Application);
+            container.For<IDisposable>().Use(c => obj, Lifetime.Application);
             container.Get<IDisposable>();
 
             container.Dispose();
@@ -195,7 +195,7 @@ namespace UnitTests.Ioc
             var obj = Substitute.For<IDisposable>();
             var container = new Container();
 
-            container.For<IDisposable>().Use(() => obj, Lifetime.Thread);
+            container.For<IDisposable>().Use(c => obj, Lifetime.Thread);
             container.Get<IDisposable>();
 
             container.Dispose();
@@ -228,7 +228,7 @@ namespace UnitTests.Ioc
             // Arrange
             var container = new Container();
             var firstChildContainer = container.CreateChildContainer();
-            firstChildContainer.For<IDisposable>().Use(() => Substitute.For<IDisposable>());
+            firstChildContainer.For<IDisposable>().Use(c => Substitute.For<IDisposable>());
             var secondChildContainer = container.CreateChildContainer();
             secondChildContainer.Register<DependsOnIDisposable>();
             var proxy = secondChildContainer.CreateProxyContainer(firstChildContainer);

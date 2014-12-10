@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Security.AccessControl;
 using System.Text;
 using System.Text.RegularExpressions;
 
@@ -9,12 +10,6 @@ namespace WebShard
 {
     public class HttpRequestContext : IHttpRequestContext
     {
-        private static readonly Regex KeyValueRegex = new Regex("(?<Key>[^&=]+)=(?<Value>[^&=]*)", RegexOptions.Compiled | RegexOptions.Singleline);
-        private static IDictionary<string, string> ParseQueryString(string queryString)
-        {
-            var m = KeyValueRegex.Matches(queryString.TrimStart('?')).Cast<Match>();
-            return m.ToDictionary(k => System.Net.WebUtility.UrlDecode(k.Groups["Key"].Value), k => System.Net.WebUtility.UrlDecode(k.Groups["Value"].Value));
-        }
         private readonly string _protocolVersion;
         private readonly string _method;
         private readonly Uri _uri;
@@ -40,31 +35,108 @@ namespace WebShard
             _remoteAddress = remoteAddress;
             _headerCollection = headers;
             _bodyStream = body;
-            _queryString = ParseQueryString(uri.Query);
+            _queryString = Routing.QueryString.Parse(uri.Query);
         }
         
         private static readonly Regex headerRegex = new Regex(@"(?<Name>[a-zA-Z\-]+)\s*:\s*(?<Value>.+)", RegexOptions.Compiled | RegexOptions.Singleline);
-        
+
+        internal class NullStream : Stream
+        {
+
+            public static readonly NullStream Instance = new NullStream();
+
+            public override void Flush()
+            {
+                
+            }
+
+            public override long Seek(long offset, SeekOrigin origin)
+            {
+                throw new NotSupportedException();
+            }
+
+            public override void SetLength(long value)
+            {
+                throw new NotSupportedException();
+            }
+
+            public override int Read(byte[] buffer, int offset, int count)
+            {
+                return 0;
+            }
+
+            public override void Write(byte[] buffer, int offset, int count)
+            {
+                throw new NotSupportedException();
+            }
+
+            public override bool CanRead
+            {
+                get { return true; }
+            }
+
+            public override bool CanSeek
+            {
+                get { return false; }
+            }
+
+            public override bool CanWrite
+            {
+                get { return false; }
+            }
+
+            public override long Length
+            {
+                get { return 0; }
+            }
+
+            public override long Position { get { return 0; }  set {throw new NotSupportedException();}}
+        }
+
+        private static string ReadLine(Stream source)
+        {
+            var bytes = new List<byte>();
+            int value;
+            while(13 != (value = source.ReadByte()))
+                bytes.Add((byte)value);
+
+            source.ReadByte();
+            return Encoding.UTF8.GetString(bytes.ToArray());
+        }
+
         public static HttpRequestContext CreateFromStream(Stream source, string scheme, string remoteAddress)
         {
-            using (var reader = new StreamReader(source, Encoding.UTF8, false, bufferSize: 8192, leaveOpen: true))
+            var stream = new BufferedStream(source, 4096);
             {
-                var topHeader = reader.ReadLine();
-                if(topHeader == null)
+                var topHeader = ReadLine(stream);
+                if (topHeader == null)
                     throw new EndOfStreamException();
                 var fields = topHeader.Split(' ');
                 string line;
                 var headers = new HeaderCollection();
-                while ("" != (line = reader.ReadLine()))
+                while ("" != (line = ReadLine(stream)))
                 {
                     if (line == null)
                         throw new EndOfStreamException();
 
                     var match = headerRegex.Match(line);
-                    if(match.Success)
+                    if (match.Success)
                         headers.Add(match.Groups["Name"].Value, match.Groups["Value"].Value);
                 }
-                return new HttpRequestContext(fields[0], new Uri(scheme + "://" + headers.Host + fields[1]), fields[2], remoteAddress, headers, source);
+                Stream contentStream;
+                var contentLength = (int) headers.ContentLength.GetValueOrDefault();
+
+                if (contentLength != 0)
+                {
+                    var readBuffer = new byte[contentLength];
+                    stream.Read(readBuffer, 0, readBuffer.Length);
+                    contentStream = new MemoryStream(readBuffer, writable: false);
+                }
+                else
+                    contentStream = NullStream.Instance;
+
+                return new HttpRequestContext(fields[0], new Uri(scheme + "://" + headers.Host + fields[1]), fields[2],
+                    remoteAddress, headers, contentStream);
             }
         }
     }

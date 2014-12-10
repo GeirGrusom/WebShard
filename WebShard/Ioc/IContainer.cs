@@ -32,9 +32,10 @@ namespace WebShard.Ioc
         void Use(Type type, Lifetime lifetime = Lifetime.None);
         void Use<T>(Lifetime lifetime = Lifetime.None)
             where T : class;
-        void Use<T>(Func<T> proc, Lifetime lifetime = Lifetime.None)
+        void Use<T>(Func<IContainer, T> proc, Lifetime lifetime = Lifetime.None)
             where T : class;
     }
+
 
     public static class ContainerExtensions
     {
@@ -49,7 +50,7 @@ namespace WebShard.Ioc
             container.For(type).Use(type, lifetime);
         }
 
-        public static void Register<T>(this IContainer container, Func<T> proc , Lifetime lifetime = Lifetime.None)
+        public static void Register<T>(this IContainer container, Func<IContainer, T> proc , Lifetime lifetime = Lifetime.None)
             where T : class
         {
             container.For<T>().Use(proc, lifetime);

@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text;
 using WebShard.Mvc;
 
 namespace WebShard
@@ -46,8 +48,8 @@ namespace WebShard
             using (var requestContainer = _container.CreateRequestChildContainer())
             {
 
-                requestContainer.For<IHttpRequestContext>().Use(() => requestContext, Lifetime.Application);
-                requestContainer.For<IHttpResponseContext>().Use(() => response, Lifetime.Application);
+                requestContainer.For<IHttpRequestContext>().Use(c => requestContext, Lifetime.Application);
+                requestContainer.For<IHttpResponseContext>().Use(c => response, Lifetime.Application);
 
                 IDictionary<string, string> routeValues;
                 var route = _routeTable.Match(SanitizePathAndQueryAndReturnPath(requestContext.Uri.PathAndQuery),
@@ -89,12 +91,20 @@ namespace WebShard
                     requestContainer.Dispose();
                     return response;
                 }
-
+                string postValue;
+                if (requestContext.Method == HttpMethods.Post)
+                {
+                    var content = new byte[requestContext.Headers.ContentLength.GetValueOrDefault()];
+                    requestContext.Body.Read(content, 0, (int)requestContext.Headers.ContentLength.GetValueOrDefault());
+                    postValue = Encoding.UTF8.GetString(content);
+                }
+                else
+                    postValue = "";
                 var actionInvoker = new ActionInvoker(controller.GetType());
                 IResponse result;
                 try
                 {
-                    result = actionInvoker.Invoke(controller, routeValues);
+                    result = actionInvoker.Invoke(controller, routeValues, postValue);
                 }
                 catch (HttpException ex)
                 {

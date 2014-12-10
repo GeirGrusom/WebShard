@@ -69,6 +69,7 @@
     <Compile Include="Ioc\IContainer.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RequestExceptionEventArgs.cs" />
+    <Compile Include="Routing\QueryStringDeserializer.cs" />
     <Compile Include="Routing\Route.cs" />
     <Compile Include="Routing\RouteMatcher.cs" />
     <Compile Include="Routing\RouteTable.cs" />

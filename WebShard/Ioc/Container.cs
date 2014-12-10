@@ -424,10 +424,11 @@ namespace WebShard.Ioc
                 Use(typeof(T), cacheLifetime);//_container.typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(CreateFunc<T>(), CreateLifetime(cacheLifetime)), (a, b) => { throw new Exception(); });
             }
 
-            public void Use<T>(Func<T> proc, Lifetime cacheLifetime = Lifetime.None)
+
+            public void Use<T>(Func<IContainer, T> proc, Lifetime cacheLifetime = Lifetime.None)
                 where T : class
             {
-                var def = _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(cont => proc(), CreateLifetime(_defineFor, cacheLifetime)), (a, b) => new Definition<T>(c => proc(), CreateLifetime(_defineFor, cacheLifetime)));
+                var def = _container._typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(proc, CreateLifetime(_defineFor, cacheLifetime)), (a, b) => new Definition<T>(proc, CreateLifetime(_defineFor, cacheLifetime)));
                 if (cacheLifetime == Lifetime.Request)
                 {
                     _container._requestTypeMap.AddOrUpdate(_defineFor, def, (t, d) => def);

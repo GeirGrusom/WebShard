@@ -59,6 +59,7 @@
     <Compile Include="Ioc\ContainerTests.cs" />
     <Compile Include="Mvc\ActionInvokerTests.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Routing\QueryStringTests.cs" />
     <Compile Include="Routing\RouteMatcherTests.cs" />
   </ItemGroup>
   <ItemGroup>
