@@ -218,6 +218,16 @@ namespace WebShard.Serialization
             return false;
         }
 
+        private bool TryConsumeWhitespace()
+        {
+            char ch;
+            if (TryPeek(0, out ch) && char.IsWhiteSpace(ch))
+            {
+                ConsumeWhile(Char.IsWhiteSpace);
+                return true;
+            }
+            return false;
+        }
 
         private bool TryConsumeConstant(string constant)
         {
@@ -230,11 +240,50 @@ namespace WebShard.Serialization
             return false;
         }
 
+        private bool TryConsumeNumber()
+        {
+            char ch;
+            int offset = 0;
+            if (TryPeek(0, out ch) && char.IsDigit(ch))
+            {
+                while (TryPeek(offset, out ch) && char.IsDigit(ch))
+                    offset++;
+                if (TryPeek(offset, out ch) && ch == '.')
+                {
+                    offset++;
+                    if (TryPeek(offset, out ch) && char.IsDigit(ch))
+                    {
+                        while (TryPeek(offset, out ch) && char.IsDigit(ch))
+                            offset++;
+                    }
+                    else
+                        return false;
+                }
+            }
+            else if (TryPeek(offset, out ch) && ch == '.')
+            {
+                offset++;
+                if (TryPeek(offset, out ch) && char.IsDigit(ch))
+                {
+                    while (TryPeek(offset, out ch) && char.IsDigit(ch))
+                        offset++;
+                }
+                else
+                    return false;
+            }
+            else
+                return false;
+
+            for (int i = 0; i < offset; i++)
+                Consume();
+            return true;
+        }
+
         public IEnumerable<Token> Tokenize()
         {
             while (_position < _input.Length)
             {
-                if (TryConsumeRegex(@"^\s+"))
+                if (TryConsumeWhitespace())
                 {
                     yield return EmitToken(TokenType.Whitespace);
                     continue;
@@ -249,7 +298,7 @@ namespace WebShard.Serialization
                     yield return EmitToken(TokenType.Comment);
                     continue;
                 }
-                if (TryConsumeRegex(@"^((\d+(\.\d+)?)|(\.\d+))"))
+                if (TryConsumeNumber())
                 {
                     yield return EmitToken(TokenType.Number);
                     continue;
