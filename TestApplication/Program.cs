@@ -18,6 +18,11 @@ namespace WebShard
             _request = request;
         }
 
+        public IResponse JsonTest()
+        {
+            return new JsonResponse(new { Foo = 123, Bar = new[] { 1, 2, 3 } });
+        }
+
         public IResponse Post(Model model)
         {
             return new ContentResponse("Foo");
@@ -68,7 +73,7 @@ namespace WebShard
             app.FilterRegistry.Register(c => new PasswordCredentials("foo", "bar"));
             app.FilterRegistry.Register<BasicAuthorizationFilter>();
             app.ControllerRegistry.Register<TestController>();
-            app.RouteTable.Add("/", new { controller = "Test" });          
+            app.RouteTable.Add("/{action?}", new { controller = "Test" });
 
             var server = new HttpWebServer(app);
 

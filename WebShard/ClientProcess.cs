@@ -46,27 +46,14 @@ namespace WebShard
 
                 while (_client.Connected && !_cancelToken.IsCancellationRequested)
                 {
-
                     while (!netStream.DataAvailable)
                     {
                         Thread.Sleep(0);
                     }
 
-
                     var request = HttpRequestContext.CreateFromStream(stream, _isSecure ? "https" : "http",
                         _client.Client.RemoteEndPoint.ToString());
-                    /*
-                    var response = new HttpResponseContext(request);
-                    if (request.Headers.Connection == "keep-alive")
-                        response.Headers.Connection = "keep-alive";
-                    else
-                        response.Headers.Connection = "close";
 
-                    var content =
-                        new ContentResponse(
-                            "<!doctype html><html><heade><title>Test</title></head><body><h4>Hello World!</h4></body></html>");
-                    content.Write(response);
-                     */
                     var response = _webServer.Application.ProcessRequest(request);
                     response.WriteResponse(stream);
                     stream.Flush();

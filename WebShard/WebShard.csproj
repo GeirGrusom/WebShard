@@ -54,6 +54,7 @@
     <Compile Include="Ioc\TypeDefinitionNotFoundException.cs" />
     <Compile Include="IRequestFilter.cs" />
     <Compile Include="IResponse.cs" />
+    <Compile Include="JsonResponse.cs" />
     <Compile Include="Mvc\ActionInvoker.cs" />
     <Compile Include="Mvc\ControllerAttribute.cs" />
     <Compile Include="FileSystemResponse.cs" />
@@ -73,6 +74,8 @@
     <Compile Include="Routing\Route.cs" />
     <Compile Include="Routing\RouteMatcher.cs" />
     <Compile Include="Routing\RouteTable.cs" />
+    <Compile Include="Serialization\JsonDeserializer.cs" />
+    <Compile Include="Serialization\JsonSerializer.cs" />
     <Compile Include="Status.cs" />
     <Compile Include="StatusResponse.cs" />
     <Compile Include="WebServer.cs" />

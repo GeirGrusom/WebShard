@@ -421,7 +421,7 @@ namespace WebShard.Ioc
             public void Use<T>(Lifetime cacheLifetime = Lifetime.None)
                 where T : class
             {
-                Use(typeof(T), cacheLifetime);//_container.typeMap.AddOrUpdate(_defineFor, t => new Definition<T>(CreateFunc<T>(), CreateLifetime(cacheLifetime)), (a, b) => { throw new Exception(); });
+                Use(typeof(T), cacheLifetime);
             }
 
 
