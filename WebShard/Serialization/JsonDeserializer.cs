@@ -1,8 +1,7 @@
 ﻿using System;
+using System.Collections;
 using System.Collections.Generic;
 using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
 namespace WebShard.Serialization
@@ -41,6 +40,7 @@ namespace WebShard.Serialization
     {
         Whitespace,
         Comment,
+        Colon,
         LeftBrace,
         RightBrace,
         LeftBracket,
@@ -54,303 +54,76 @@ namespace WebShard.Serialization
         Comma,
     }
 
-    public class JsonTokenizer
+    interface IJsonInternalDeserializer
     {
-        private readonly string _input;
-        private char _currentValue;
-        private int _position;
-        private int _startLine;
-        private int _startColumn;
+        object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType);
+    }
 
-        private int _currentLine;
-        private int _currentColumn;
-
-        private StringBuilder _currentToken;
-
-        public JsonTokenizer(string input)
+    class JsonNumberDeserializer : IJsonInternalDeserializer
+    {
+        public static readonly JsonNumberDeserializer Instance = new JsonNumberDeserializer();
+        public object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType)
         {
-            _currentToken = new StringBuilder();
-            _input = input;
-            _currentLine = 1;
-            _startLine = 1;
-            _startColumn = 1;
-        }
+            if(tokenStream.Current.Type != TokenType.Number)
+                throw new FormatException("Expected number.");
 
-        private bool TryRead()
-        {
-            if (_position + 1 > _input.Length)
-                return false;
-
-            if (_currentValue == '\n')
-            {
-                _currentLine++;
-                _currentColumn = 0;
-            }
-            else
-                _currentColumn++;
-
-            _currentValue = _input[_position++];
-                
-            return true;
-        }
-
-        private void Consume()
-        {
-            TryRead();
-            _currentToken.Append(_currentValue);
-        }
-
-        private void ConsumeWhile(Func<char, bool> exp)
-        {
-            char ch;
-            while (TryPeek(0, out ch) && exp(ch))
-                Consume();
-        }
-
-        private Token EmitToken(TokenType type)
-        {
-            var result = new Token(_startLine, _startColumn, _currentToken.ToString(), type);
-            _currentToken.Clear();
-            _startColumn = _currentColumn;
-            _startLine = _currentLine;
+            object result = Convert.ChangeType(tokenStream.Current.Value, resultType);
+            tokenStream.MoveNext();
             return result;
         }
+    }
 
-        private bool TryReadString()
+    class JsonBoolDeserializer : IJsonInternalDeserializer
+    {
+        public static readonly JsonBoolDeserializer Instance = new JsonBoolDeserializer();
+
+
+        public object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType)
         {
-            char ch;
-            if (TryPeek(0, out ch) && ch == '"')
-            {
-                Consume();
-                char ch1;
-                while (TryPeek(0, out ch1) && ((Func<char, bool>) (c => c!= '"'))(ch1))
-                    Consume();
-                Consume();
-                return true;
-            }
-            return false;
+            bool result;
+            if (tokenStream.Current.Type == TokenType.True)
+                result = true;
+            else if (tokenStream.Current.Type == TokenType.False)
+                result = false;
+            else
+                throw new InvalidOperationException("Boolean deserializer doesn't understand non-bool.");
+            tokenStream.MoveNext();
+            return result;
         }
+    }
 
-        private bool TryPeek(int offset, out char value)
+    class JsonArrayDeserializer : IJsonInternalDeserializer
+    {
+        public static readonly JsonArrayDeserializer Instance = new JsonArrayDeserializer();
+        public object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType)
         {
-            if (_position + offset >= _input.Length)
+            if (tokenStream.Current.Type != TokenType.LeftBracket)
             {
-                value = default(char);
-                return false;
+                throw new FormatException("Expected '['");
             }
-            value = _input[_position + offset];
-            return true;
-        }
 
-        private bool TryPeek(string constant)
-        {
-            if (_position + constant.Length > _input.Length)
-                return false;
-            for (int i = 0; i < constant.Length; i++)
+            Type arrayElements;
+            if (resultType.IsArray)
             {
-                if (_input[_position + i] != constant[i])
-                    return false;
-            }
-            return true;
-        }
-
-        private bool TryConsumeComment()
-        {
-            if (TryPeek("/*"))
-            {
-                Consume();
-                Consume();
-
-                bool lastWasAsterisk = false;
-                char ch;
-                while (TryPeek(0, out ch))
-                {
-                    if (ch == '*')
-                        lastWasAsterisk = true;
-                    else
-                    {
-                        if (ch == '/' && lastWasAsterisk)
-                        {
-                            Consume();
-                            return true;
-                        }
-                        lastWasAsterisk = false;
-                    }
-                    Consume();
-                }
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeLineComment()
-        {
-            if (TryPeek("//"))
-            {
-                Consume();
-                Consume();
-                char ch;
-                while (TryPeek(0, out ch) && ch != 'n')
-                {
-                    if (ch == '\r')
-                        TryRead();
-                    else
-                        Consume();
-                }
-                if (ch == '\n')
-                    TryRead();
-
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeRegex(string regex)
-        {
-            var reg = new Regex(regex, RegexOptions.Singleline);
-            var match = reg.Match(_input, _position);
-            if (match.Success)
-            {
-                for (int i = 0; i < match.Value.Length; i++)
-                    Consume();
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeWhitespace()
-        {
-            char ch;
-            if (TryPeek(0, out ch) && char.IsWhiteSpace(ch))
-            {
-                ConsumeWhile(Char.IsWhiteSpace);
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeConstant(string constant)
-        {
-            if (TryPeek(constant))
-            {
-                for (int i = 0; i < constant.Length; i++)
-                    Consume();
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeNumber()
-        {
-            char ch;
-            int offset = 0;
-            if (TryPeek(0, out ch) && char.IsDigit(ch))
-            {
-                while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                    offset++;
-                if (TryPeek(offset, out ch) && ch == '.')
-                {
-                    offset++;
-                    if (TryPeek(offset, out ch) && char.IsDigit(ch))
-                    {
-                        while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                            offset++;
-                    }
-                    else
-                        return false;
-                }
-            }
-            else if (TryPeek(offset, out ch) && ch == '.')
-            {
-                offset++;
-                if (TryPeek(offset, out ch) && char.IsDigit(ch))
-                {
-                    while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                        offset++;
-                }
-                else
-                    return false;
+                arrayElements = resultType.GetElementType();
             }
             else
-                return false;
-
-            for (int i = 0; i < offset; i++)
-                Consume();
-            return true;
-        }
-
-        public IEnumerable<Token> Tokenize()
-        {
-            while (_position < _input.Length)
-            {
-                if (TryConsumeWhitespace())
-                {
-                    yield return EmitToken(TokenType.Whitespace);
-                    continue;
-                }
-                if (TryConsumeComment())
-                {
-                    yield return EmitToken(TokenType.Comment);
-                    continue;
-                }
-                if (TryConsumeLineComment())
-                {
-                    yield return EmitToken(TokenType.Comment);
-                    continue;
-                }
-                if (TryConsumeNumber())
-                {
-                    yield return EmitToken(TokenType.Number);
-                    continue;
-                }
-
-                if (TryConsumeConstant("{"))
-                {
-                    yield return EmitToken(TokenType.LeftBrace);
-                    continue;
-                }
-                if (TryConsumeConstant("}"))
-                {
-                    yield return EmitToken(TokenType.RightBrace);
-                    continue;
-                }
-                if (TryConsumeConstant("["))
-                {
-                    yield return EmitToken(TokenType.LeftBracket);
-                    continue;
-                }
-                if (TryConsumeConstant("]"))
-                {
-                    yield return EmitToken(TokenType.RightBracket);
-                    continue;
-                }
-                if (TryConsumeConstant(","))
-                {
-                    yield return EmitToken(TokenType.Comma);
-                    continue;
-                }
-                if (TryReadString())
-                {
-                    yield return EmitToken(TokenType.String);
-                    continue;
-                }
-                if (TryConsumeConstant("null"))
-                {
-                    yield return EmitToken(TokenType.Null);
-                    continue;
-                }
-                if (TryConsumeConstant("false"))
-                {
-                    yield return EmitToken(TokenType.False);
-                    continue;
-                }
-                if (TryConsumeConstant("true"))
-                {
-                    yield return EmitToken(TokenType.True);
-                    continue;
-                }
                 throw new NotImplementedException();
+            var values = (IList)Activator.CreateInstance(typeof (IList<>).MakeGenericType(arrayElements));
+
+            tokenStream.MoveNext();
+            while (tokenStream.Current.Type != TokenType.RightBracket)
+            {
+                object value = JsonDeserializer.Instance.Deserialize(ref tokenStream, arrayElements);
+                values.Add(value);
+                if (tokenStream.Current.Type != TokenType.Comma)
+                    break;
             }
+            if (tokenStream.Current.Type != TokenType.RightBracket)
+                throw new FormatException("Expected ']'");
+            tokenStream.MoveNext();
+
+            throw new NotImplementedException();
         }
     }
 
@@ -358,9 +131,44 @@ namespace WebShard.Serialization
     {
         internal static readonly JsonDeserializer Instance = new JsonDeserializer();
 
-        public static object Deserialize(string json, Type resultType)
+        internal object Deserialize(ref IEnumerator<Token> enumerator, Type resultType)
         {
+            var token = enumerator.Current;
+            if (token.Type == TokenType.Number)
+                return JsonNumberDeserializer.Instance.Deserialize(ref enumerator, resultType);
+            if (resultType == typeof (string))
+            {
+                if(token.Type != TokenType.String && token.Type != TokenType.Identifier)
+                    throw new FormatException("Expected string or identifier.");
+                string value = token.Value;
+                if (token.Type == TokenType.String)
+                    value = value.Trim('"');
+                enumerator.MoveNext();
+                return value;
+            }
+            if (resultType == typeof (bool))
+            {
+                return JsonBoolDeserializer.Instance.Deserialize(ref enumerator, resultType);
+            }
+            if (token.Type == TokenType.LeftBrace && resultType.IsArray)
+            {
+                return JsonArrayDeserializer.Instance.Deserialize(ref enumerator, resultType);
+            }
             throw new NotImplementedException();
+        }
+
+        public T Deserialize<T>(string json)
+        {
+            return (T)Deserialize(json, typeof (T));
+        }
+
+        public object Deserialize(string json, Type resultType)
+        {
+            var tokens = new JsonTokenizer(json);
+            var enumerator = tokens.Where(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Comment).GetEnumerator();
+            if (!enumerator.MoveNext())
+                return null;
+            return Deserialize(ref enumerator, resultType);
         }
     }
 }
