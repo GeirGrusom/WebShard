@@ -7,9 +7,10 @@ This web server started out when the ridiculousness of HttpContext.Current
 was made apparent for the millionth time. It is intended to be a slim, 
 no-nonsense web server that supplies you with everything you need to be 
 able to set up simple applications that can be used for configuration
-of services or other data front ends.
+of services or other data front ends. *It is not intended for large scale
+web applications*.
 
-It has built-in dependency injection, url routing, and a controller model. 
+It has built-in dependency injection, url routing, serialization and a controller model. 
 Generally there is no need for inheritence. Most processes can be done
 either by implementing (simple) interfaces, dependency injection or 
 attributes.
@@ -23,6 +24,8 @@ It supports:
 * Dependency Injection
 * Controllers and routing
 * Request filtering
+* JSON serialization
+* www-x-form deserialization
  
 Using WebShard
 ==============
@@ -43,8 +46,8 @@ Routing is fairly similar to MVC or Web API, and is of the following pattern:
 `{RouteValueName?:RegularExpression}`
 
 * `RouteValueName` is a identifier which must be valid in C# as a identifier.
-* `?` is *optional* and specified that the identifier is optional.
-* `RegularExpression` is a regular expression that must match the expression
+* `?` is *optional* and specifies that the route segment is optional.
+* `RegularExpression` is a *optional* regular expression that must match the expression
   for the route to be considered a match.
 
 Route example
@@ -58,7 +61,7 @@ Controllers
 Controllers are classes with one or several methods that return a `IResponse`.
 There are no base class to inherit from, or interfaces to implement, but
 they have to be registered before they will be matched, end with 'Controller' and have to have at
-least one public constructor.
+least one public constructor. Note that DI will try to match the most comprehensive constructor.
 
 Controller example
 ------------------
@@ -101,5 +104,4 @@ static class Program
 Known issues
 ============
 
-* POST data is not deserialized, so currently POST doesn't work unless the controller does
-  all the hard work.
+* JSON deserialization is not yet completed. In the future it is intended that you can replace the built-in JSON serializstion with JSON.NET if you so please.
