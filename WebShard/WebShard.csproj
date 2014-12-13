@@ -74,6 +74,7 @@
     <Compile Include="Routing\Route.cs" />
     <Compile Include="Routing\RouteMatcher.cs" />
     <Compile Include="Routing\RouteTable.cs" />
+    <Compile Include="Serialization\DeserializationException.cs" />
     <Compile Include="Serialization\JsonDeserializer.cs" />
     <Compile Include="Serialization\JsonSerializer.cs" />
     <Compile Include="Serialization\JsonTokenizer.cs" />

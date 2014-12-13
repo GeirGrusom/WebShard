@@ -68,55 +68,10 @@ namespace WebShard.Serialization
         T Deserialize(ref IEnumerator<Token> tokenStream);
     }
 
-    class JsonNumberDeserializer : IJsonInternalDeserializer
+
+    static class JsonBoolDeserializer
     {
-        static class JsonNumberParser<T>
-        {
-            private static readonly Func<string, T> parse; 
-            static JsonNumberParser()
-            {
-                var parseMethod = typeof (T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (string), typeof (IFormatProvider)}, null);
-                var input = Expression.Parameter(typeof (string));
-                if (parseMethod == null)
-                {
-                    parseMethod = typeof (T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (string)}, null);
-
-
-                    parse = Expression.Lambda<Func<string, T>>(Expression.Call(parseMethod, input)).Compile();
-                    return;
-                }
-
-                var cultureInfo = Expression.Constant(CultureInfo.InvariantCulture, typeof (IFormatProvider));
-                parse = Expression.Lambda<Func<string, T>>(Expression.Call(parseMethod, input, cultureInfo)).Compile();
-            }
-            public static T Parse(string input)
-            {
-                return parse(input);
-            }
-        }
-
-        public static readonly JsonNumberDeserializer Instance = new JsonNumberDeserializer();
-        public object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType)
-        {
-            if(tokenStream.Current.Type != TokenType.Number)
-                throw new FormatException("Expected number.");
-
-            object result = Convert.ChangeType(tokenStream.Current.Value, resultType);
-            tokenStream.MoveNext();
-            return result;
-        }
-
-        public T Deserialize<T>(ref IEnumerator<Token> tokenStream)
-        {
-            return JsonNumberParser<T>.Parse(tokenStream.Current.Value);
-        }
-    }
-
-    class JsonBoolDeserializer
-    {
-        internal static readonly JsonBoolDeserializer Instance = new JsonBoolDeserializer();
-
-        public bool Deserialize(ref IEnumerator<Token> tokenStream)
+        public static bool Deserialize(ref IEnumerator<Token> tokenStream)
         {
             bool result;
             if (tokenStream.Current.Type == TokenType.True)
@@ -132,6 +87,20 @@ namespace WebShard.Serialization
 
     static class TypeHelper
     {
+        public static DeserializeElement<T> CreateDeserializeProc<T>()
+        {
+            var deType = JsonDeserializer.GetDeserializer<T>();
+            var method = deType.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.Static, null,
+                new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
+            var input = Expression.Parameter(typeof (IEnumerator<Token>).MakeByRefType());
+
+            var l = Expression.Lambda<DeserializeElement<T>>(
+                Expression.Call(null, method, input), input
+                );
+
+            return l.Compile();
+
+        }
         public static bool ImplementsInterface<TInterface>(this Type type)
         {
             return type.GetInterface(typeof(TInterface).Name) != null; 
@@ -145,10 +114,8 @@ namespace WebShard.Serialization
 
     internal delegate void ParseArrayElement<T>(ref IEnumerator<Token> tokenStream, List<T> list);
 
-    class JsonArrayDeserializer<T>// : IJsonInternalDeserializer<T[]>, IJsonInternalDeserializer
+    static class JsonArrayDeserializer<T>// : IJsonInternalDeserializer<T[]>, IJsonInternalDeserializer
     {
-
-        internal static readonly JsonArrayDeserializer<T> Instance = new JsonArrayDeserializer<T>();
 
         private static readonly ParseArrayElement<T> parseElement;
 
@@ -158,17 +125,15 @@ namespace WebShard.Serialization
             var input = Expression.Parameter(typeof (IEnumerator<Token>).MakeByRefType(), "tokenStream");
             var output = Expression.Parameter(typeof (ICollection<T>));
             var addProc = typeof (ICollection<T>).GetMethod("Add", new [] { typeof (T)});
-            var func = deserializerType.GetMethod("Deserialize", new[] {typeof (IEnumerator<Token>).MakeByRefType()});
-            object instance =
-                deserializerType.GetField("Instance", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            var func = deserializerType.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.Static, null,  new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
             var lambda =
                 Expression.Lambda<ParseArrayElement<T>>(
                     Expression.Call(output, addProc,
-                        Expression.Call(Expression.Constant(instance, deserializerType), func, input)), input, output);
+                        Expression.Call(null, func, input)), input, output);
             parseElement = lambda.Compile();
         }
 
-        public T[] Deserialize(ref IEnumerator<Token> tokenStream)
+        public static T[] Deserialize(ref IEnumerator<Token> tokenStream)
         {
             if(tokenStream.Current.Type != TokenType.LeftBracket)
                 throw new FormatException("Expected '['");
@@ -257,11 +222,10 @@ namespace WebShard.Serialization
 
     }
 
-    internal class JsonParseNumberStylesFormatProviderDeserializer<T>
+    internal static class JsonParseNumberStylesFormatProviderDeserializer<T>
     {
         private static readonly Func<string, T> Parse;
 
-        internal static JsonParseNumberStylesFormatProviderDeserializer<T> Instance = new JsonParseNumberStylesFormatProviderDeserializer<T>(); 
 
         static JsonParseNumberStylesFormatProviderDeserializer()
         {
@@ -275,7 +239,7 @@ namespace WebShard.Serialization
 
         }
 
-        public T Deserialize(ref IEnumerator<Token> tokenStream)
+        public static T Deserialize(ref IEnumerator<Token> tokenStream)
         {
             T result = Parse(tokenStream.Current.Value);
             tokenStream.MoveNext();
@@ -283,10 +247,10 @@ namespace WebShard.Serialization
         }
     }
 
-    internal class JsonParseFormatProviderDeserializer<T>
+    internal static class JsonParseFormatProviderDeserializer<T>
     {
         private static readonly Func<string, T> Parse;
-        internal static readonly JsonParseFormatProviderDeserializer<T> Instance = new JsonParseFormatProviderDeserializer<T>(); 
+        
         static JsonParseFormatProviderDeserializer()
         {
             var input = Expression.Parameter(typeof(string), "input");
@@ -299,7 +263,7 @@ namespace WebShard.Serialization
 
         }
 
-        public T Deserialize(ref IEnumerator<Token> tokenStream)
+        public static T Deserialize(ref IEnumerator<Token> tokenStream)
         {
             T result = Parse(tokenStream.Current.Value);
             tokenStream.MoveNext();
@@ -307,10 +271,10 @@ namespace WebShard.Serialization
         }
     }
 
-    internal class JsonParseDeserializer<T>
+    internal static class JsonParseDeserializer<T>
     {
         private static readonly Func<string, T> Parse;
-        internal static readonly JsonParseDeserializer<T> Instance = new JsonParseDeserializer<T>(); 
+        
         static JsonParseDeserializer()
         {
             var input = Expression.Parameter(typeof(string), "input");
@@ -323,7 +287,7 @@ namespace WebShard.Serialization
 
         }
 
-        public T Deserialize(ref IEnumerator<Token> tokenStream)
+        public static T Deserialize(ref IEnumerator<Token> tokenStream)
         {
             T result = Parse(tokenStream.Current.Value);
             tokenStream.MoveNext();
@@ -331,11 +295,10 @@ namespace WebShard.Serialization
         }
     }
 
-    internal class JsonStringDeserializer
+    internal static class JsonStringDeserializer
     {
-        internal static readonly JsonStringDeserializer Instance = new JsonStringDeserializer();
 
-        public string Deserialize(ref IEnumerator<Token> tokenStream)
+        public static string Deserialize(ref IEnumerator<Token> tokenStream)
         {
             var token = tokenStream.Current;
             string result;
@@ -344,10 +307,120 @@ namespace WebShard.Serialization
             else if (token.Type == TokenType.Identifier)
                 result = token.Value;
             else
-                throw new FormatException();
+                throw new DeserializationException(token);
             tokenStream.MoveNext();
 
             return result;
+        }
+    }
+
+    
+
+    internal delegate TResult DeserializeElement<out TResult>(ref IEnumerator<Token> tokenStream);
+
+    static class JsonDictionaryDeserializer<TCollection, TKey, TValue>
+        where TCollection : IDictionary<TKey, TValue>
+    {
+        private static readonly DeserializeElement<TKey> deserializeKey;
+        private static readonly DeserializeElement<TValue> deserializeValue; 
+
+        static JsonDictionaryDeserializer()
+        {
+            deserializeKey = TypeHelper.CreateDeserializeProc<TKey>();
+            deserializeValue = TypeHelper.CreateDeserializeProc<TValue>();
+
+        }
+
+        public static TCollection Deserialize(ref IEnumerator<Token> tokenStream)
+        {
+            var token = tokenStream.Current;
+
+            if(token.Type != TokenType.LeftBrace)
+                throw new DeserializationException(token, "Expected '{'");
+            tokenStream.MoveNext();
+
+            var result = Activator.CreateInstance<TCollection>();
+
+            while (tokenStream.Current.Type != TokenType.RightBrace)
+            {
+                var key = deserializeKey(ref tokenStream);
+                if(tokenStream.Current.Type != TokenType.Colon)
+                    throw new DeserializationException(tokenStream.Current, "Expected ','");
+                tokenStream.MoveNext();
+                var value = deserializeValue(ref tokenStream);
+
+                result.Add(key,value);
+
+                if (tokenStream.Current.Type != TokenType.Comma)
+                    break;
+                tokenStream.MoveNext();
+            }
+            if(tokenStream.Current.Type != TokenType.RightBrace)
+                throw new DeserializationException(tokenStream.Current, "Expected '}'");
+            tokenStream.MoveNext();
+
+            return result;
+        }
+    }
+
+    static class JsonObjectDeserializer<T>
+    {
+
+        //private static readonly Dictionary<string, Action<>> fi 
+
+        public static T Deserialize(ref IEnumerator<Token> tokenStream)
+        {
+            var token = tokenStream.Current;
+
+            if (token.Type != TokenType.LeftBrace)
+                throw new FormatException();
+
+            var ctors = typeof (T).GetConstructors();
+
+            var ctor = ctors.OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+            if(ctor == null)
+                throw new DeserializationException(token, string.Format("Unable to deserialize '{0}' because it has no public constructors.", typeof(T)));
+
+            if (ctor.GetParameters().Length == 0)
+                throw new DeserializationException(token, string.Format("The type '{0}' only has a public default constructor available. Not currently supported."));
+
+            tokenStream.MoveNext();
+
+            var values = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            var parameters = ctor.GetParameters().ToDictionary(p => p.Name, p => p, StringComparer.OrdinalIgnoreCase);
+
+            while (tokenStream.Current.Type != TokenType.RightBrace)
+            {
+                var nameToken = tokenStream.Current;
+                var left = JsonStringDeserializer.Deserialize(ref tokenStream);
+                ParameterInfo par;
+                if(!parameters.TryGetValue(left, out par))
+                    throw new DeserializationException(nameToken, "Missing field");
+                if(tokenStream.Current.Type != TokenType.Colon)
+                    throw new DeserializationException(tokenStream.Current, "Expected ':'");
+                tokenStream.MoveNext();
+
+                var right = JsonDeserializer.Deserialize(ref tokenStream, par.ParameterType);
+                values[left] = right;
+
+                if (tokenStream.Current.Type != TokenType.Comma)
+                    break;
+                tokenStream.MoveNext();
+            }
+            
+            if(tokenStream.Current.Type != TokenType.RightBrace)
+                throw new DeserializationException(tokenStream.Current, "Expected '}'");
+
+            foreach (var item in parameters.Keys.Where(p => !values.ContainsKey(p)))
+            {
+                var p = parameters[item];
+                if(!p.HasDefaultValue)
+                    throw new DeserializationException(token, "The parameter '{0}' is not defined and has no default value.");
+                values[item] = p.DefaultValue;
+            }
+
+            return (T) ctor.Invoke(parameters.Values.OrderBy(p => p.Position).Select(p => values[p.Name]).ToArray());
+
         }
     }
 
@@ -383,19 +456,43 @@ namespace WebShard.Serialization
                 return typeof (JsonArrayDeserializer<>).MakeGenericType(t.GetElementType());
 
             if (t.IsInterface && t.IsGenericType && t.GetGenericTypeDefinition() == typeof(IEnumerable<>))
-            {
+                // Deserialize IEnumerable<T> as T[].
                 return GetDeserializer(t.GetGenericArguments()[0].MakeArrayType());
+
+            if (t.IsInterface && t.IsGenericType && t.GetGenericTypeDefinition() == typeof (IDictionary<,>))
+            {
+                // Deserialize IDictionary<,> as Dictionary<,>
+                var args = t.GetGenericArguments();
+                return
+                    typeof (JsonDictionaryDeserializer<,,>).MakeGenericType(
+                        typeof (Dictionary<,>).MakeGenericType(args[0], args[1]), args[0], args[1]);
             }
 
-            throw new NotImplementedException();
-            
+
+            return typeof (JsonObjectDeserializer<>).MakeGenericType(t);
+
         }
 
-        internal object Deserialize(ref IEnumerator<Token> enumerator, Type resultType)
+
+
+        internal static T Deserialize<T>(ref IEnumerator<Token> tokenStream)
+        {
+            return (T)Deserialize(ref tokenStream, typeof (T));
+        }
+
+        internal static object Deserialize(ref IEnumerator<Token> tokenStream, Type resultType)
+        {
+            var type = GetDeserializer(resultType);
+
+            var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] { typeof(IEnumerator<Token>).MakeByRefType() }, null);
+
+            return invokeMethod.Invoke(null, new object[] { tokenStream });
+        }
+/*        internal object Deserialize(ref IEnumerator<Token> enumerator, Type resultType)
         {
             var token = enumerator.Current;
             if (token.Type == TokenType.Number)
-                return JsonNumberDeserializer.Instance.Deserialize(ref enumerator, resultType);
+                return JsonNumberDeserializer.Deserialize(ref enumerator, resultType);
             if (resultType == typeof (string))
             {
                 if(token.Type != TokenType.String && token.Type != TokenType.Identifier)
@@ -414,13 +511,15 @@ namespace WebShard.Serialization
             {
                 var elType = resultType.GetElementType();
                 var deserializerType = typeof (JsonArrayDeserializer<>).MakeGenericType(elType);
-                object deser = deserializerType.GetField("Instance", BindingFlags.NonPublic | BindingFlags.Static).GetValue(null);
-                var deserMethod = deserializerType.GetMethod("Deserialize",
-                    new[] {typeof (IEnumerator<Token>).MakeByRefType()});
-                return deserMethod.Invoke(deser, new object [] { enumerator });
+                
+                var deserMethod = deserializerType.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.Static, null,
+                    new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
+                return deserMethod.Invoke(null, new object [] { enumerator });
             }
             throw new NotImplementedException();
-        }
+        }*/
+
+        
 
         public T Deserialize<T>(string json)
         {
@@ -435,12 +534,10 @@ namespace WebShard.Serialization
                 return null;
 
             var type = GetDeserializer(resultType);
-            var instance = type.GetField("Instance", BindingFlags.Static | BindingFlags.NonPublic).GetValue(null);
+            
+            var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
 
-            var invokeMethod = type.GetMethod("Deserialize", new[] {typeof (IEnumerator<Token>).MakeByRefType()});
-
-            return invokeMethod.Invoke(instance, new object[] {enumerator});
-
+            return invokeMethod.Invoke(null, new object[] {enumerator});
         }
     }
 }

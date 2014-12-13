@@ -35,13 +35,28 @@ namespace UnitTests.Serialization
             Assert.That(result, Is.EqualTo(expectedResult));
         }
 
+        [Test]
+        public void Deserialize_Struct()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<KeyValuePair<string, string>>("{\"Key\":\"Foo\", \"Value\":\"Bar\"}");
+
+            // Assert
+            Assert.That(result.Key, Is.EqualTo("Foo"));
+            Assert.That(result.Value, Is.EqualTo("Bar"));
+        }
+
+        [Test]
         public void Deserialize_Dictionary()
         {
             // Arrange
             var json = new JsonDeserializer();
 
             // Act
-            var result = (int[])json.Deserialize("{\"Foo\": \"bar\", \"Baz\": \"Bat\"}", typeof(IDictionary<string, string>));
+            var result = json.Deserialize("{\"Foo\": \"bar\", \"Baz\": \"Bat\"}", typeof(IDictionary<string, string>));
 
             // Assert
             Assert.That(result, Is.EquivalentTo(new Dictionary<string, string> { { "Foo", "bar" }, {"Baz", "Bat" }}));            
