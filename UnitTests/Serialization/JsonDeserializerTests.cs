@@ -35,8 +35,20 @@ namespace UnitTests.Serialization
             Assert.That(result, Is.EqualTo(expectedResult));
         }
 
+        public void Deserialize_Dictionary()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = (int[])json.Deserialize("{\"Foo\": \"bar\", \"Baz\": \"Bat\"}", typeof(IDictionary<string, string>));
+
+            // Assert
+            Assert.That(result, Is.EquivalentTo(new Dictionary<string, string> { { "Foo", "bar" }, {"Baz", "Bat" }}));            
+        }
+
         [Test]
-        public void Deserialize_Array()
+        public void Deserialize_IntArray()
         {
             // Arrange
             var json = new JsonDeserializer();
@@ -47,5 +59,19 @@ namespace UnitTests.Serialization
             // Assert
             Assert.That(result, Is.EquivalentTo(new [] { 1, 2, 3, 4}));
         }
+
+        [Test]
+        public void Deserialize_IEnumerable()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = (int[])json.Deserialize("[1, 2, 3, 4]", typeof(IEnumerable<int>));
+
+            // Assert
+            Assert.That(result, Is.EquivalentTo(new[] { 1, 2, 3, 4 }));
+        }
+
     }
 }
