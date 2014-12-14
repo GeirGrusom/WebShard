@@ -50,7 +50,34 @@ namespace UnitTests.Serialization
         }
 
         [Test]
-        public void Deserialize_Dictionary()
+        public void Deserialize_Nullable()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<int?>("10");
+
+            // Assert
+            Assert.That(result, Is.EqualTo(10));
+        }
+
+        [Test]
+        public void Deserialize_Nullable_IsNull()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<int?>("null");
+
+            // Assert
+            Assert.That(result, Is.EqualTo(null));
+
+        }
+
+        [Test]
+        public void Deserialize_IDictionary()
         {
             // Arrange
             var json = new JsonDeserializer();
@@ -60,6 +87,62 @@ namespace UnitTests.Serialization
 
             // Assert
             Assert.That(result, Is.EquivalentTo(new Dictionary<string, string> { { "Foo", "bar" }, {"Baz", "Bat" }}));            
+        }
+
+        [Test]
+        public void Deserialize_Dynamic_Dictionary()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            dynamic result = json.Deserialize("{\"Foo\": \"bar\"}");
+
+            // Assert
+            Assert.That(result.Foo, Is.EqualTo("bar"));
+        }
+
+        [Test]
+        public void Deserialize_Dynamic_Array()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            dynamic result = json.Deserialize("[1, 2, 3]");
+
+            // Assert
+            Assert.That(result, Is.EquivalentTo(new []{1m, 2m, 3m}));
+        }
+
+        [TestCase("\"Foo\"", "Foo")]
+        [TestCase("10", 10)]
+        [TestCase("false", false)]
+        [TestCase("true", true)]
+        [TestCase("null", null)]
+        public void Deserialize_Dynamic_Types(string expression, object expectedResult)
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            dynamic result = json.Deserialize(expression);
+
+            // Assert
+            Assert.That(result, Is.EqualTo(expectedResult));
+        }
+
+        [Test]
+        public void Deserialize_Dynamic_String()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            dynamic result = json.Deserialize("\"Foo\"");
+
+            // Assert
+            Assert.That(result, Is.EqualTo("Foo"));
         }
 
         [Test]

@@ -2,11 +2,14 @@
 using System.Collections;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Dynamic;
 using System.Globalization;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 using System.Threading.Tasks;
+using WebShard.Ioc;
 
 namespace WebShard.Serialization
 {
@@ -363,14 +366,116 @@ namespace WebShard.Serialization
         }
     }
 
+    static class JsonObjectDeserializer
+    {
+        public static object Deserialize(ref IEnumerator<Token> tokenStream)
+        {
+            var token = tokenStream.Current;
+            if (token.Type == TokenType.LeftBrace)
+                return JsonDictionaryDeserializer<ExpandoObject, string, object>.Deserialize(ref tokenStream);
+            if (token.Type == TokenType.String || token.Type == TokenType.Identifier)
+                return JsonStringDeserializer.Deserialize(ref tokenStream);
+            if (token.Type == TokenType.LeftBracket)
+                return JsonArrayDeserializer<object>.Deserialize(ref tokenStream);
+            if (token.Type == TokenType.Null)
+            {
+                tokenStream.MoveNext();
+                return null;
+            }
+            if (token.Type == TokenType.Number)
+                return JsonParseNumberStylesFormatProviderDeserializer<decimal>.Deserialize(ref tokenStream);
+            if (token.Type == TokenType.False || token.Type == TokenType.True)
+                return JsonBoolDeserializer.Deserialize(ref tokenStream);
+            
+            throw new DeserializationException(token, string.Format("Unexpected '{0}' at this point.", token.Value));
+        }
+    }
+
+    static class JsonNullableDeserializer<T>
+        where T : struct 
+    {
+        private static readonly DeserializeElement<T> DeserProc;
+
+        static JsonNullableDeserializer()
+        {
+            var type = JsonDeserializer.GetDeserializer<T>();
+            var method = type.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.Static, null,
+                new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
+            DeserProc = (DeserializeElement<T>)method.CreateDelegate(typeof(DeserializeElement<T>));
+        }
+
+        public static T? Deserialize(ref IEnumerator<Token> tokenStream)
+        {
+            if (tokenStream.Current.Type == TokenType.Null)
+            {
+                tokenStream.MoveNext();
+                return null;
+            }
+            return DeserProc(ref tokenStream);
+        }
+    }
+
     static class JsonObjectDeserializer<T>
     {
 
         //private static readonly Dictionary<string, Action<>> fi 
+        private static readonly DeserializeElement<T> deserProc; 
 
+        static JsonObjectDeserializer()
+        {
+            var ctors = typeof(T).GetConstructors();
+            var ctor = ctors.OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
+            if (ctor == null)
+                throw new TypeConstructionException(typeof(T), "The type does not have any public properties.");
+
+            if (ctor.GetParameters().Length == 0)
+                throw new TypeConstructionException(typeof(T), "Only a public default constructor is provided, which is not yet supported.");
+
+        }
+
+        // TODO: Write compiled version
+        private static T DeserializePropertySets(ref IEnumerator<Token> tokenStream)
+        {
+            var result = Activator.CreateInstance<T>();
+            Dictionary<string, PropertyInfo> properties =
+                typeof (T).GetProperties()
+                    .Where(p => p.CanWrite)
+                    .ToDictionary(x => x.Name, x => x, StringComparer.OrdinalIgnoreCase);
+
+            while (tokenStream.Current.Type != TokenType.RightBrace)
+            {
+                var nameToken = tokenStream.Current;
+                var left = JsonStringDeserializer.Deserialize(ref tokenStream);
+                PropertyInfo par;
+                if (!properties.TryGetValue(left, out par))
+                    throw new DeserializationException(nameToken, "Missing field");
+                if (tokenStream.Current.Type != TokenType.Colon)
+                    throw new DeserializationException(tokenStream.Current, "Expected ':'");
+                tokenStream.MoveNext();
+
+                var right = JsonDeserializer.Deserialize(ref tokenStream, par.PropertyType);
+                par.SetValue(result, right);
+
+                if (tokenStream.Current.Type != TokenType.Comma)
+                    break;
+                tokenStream.MoveNext();
+            }
+
+            if (tokenStream.Current.Type != TokenType.RightBrace)
+                throw new DeserializationException(tokenStream.Current, "Expected '}'");
+
+            return result;
+        }
+
+        // TODO: Write a compiled version.
         public static T Deserialize(ref IEnumerator<Token> tokenStream)
         {
             var token = tokenStream.Current;
+            if (token.Type == TokenType.Null)
+            {
+                tokenStream.MoveNext();
+                return default(T);
+            }
 
             if (token.Type != TokenType.LeftBrace)
                 throw new FormatException();
@@ -382,7 +487,7 @@ namespace WebShard.Serialization
                 throw new DeserializationException(token, string.Format("Unable to deserialize '{0}' because it has no public constructors.", typeof(T)));
 
             if (ctor.GetParameters().Length == 0)
-                throw new DeserializationException(token, string.Format("The type '{0}' only has a public default constructor available. Not currently supported."));
+                return DeserializePropertySets(ref tokenStream);
 
             tokenStream.MoveNext();
 
@@ -424,7 +529,7 @@ namespace WebShard.Serialization
         }
     }
 
-    public class JsonDeserializer
+    public class JsonDeserializer : IDeserializer
     {
         internal static readonly JsonDeserializer Instance = new JsonDeserializer();
 
@@ -439,6 +544,10 @@ namespace WebShard.Serialization
                 return typeof (JsonBoolDeserializer);
             if (t == typeof (string))
                 return typeof (JsonStringDeserializer);
+
+            if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Nullable<>))
+                return typeof (JsonNullableDeserializer<>).MakeGenericType(t.GetGenericArguments()[0]);
+
             // Check if the type has a TryParse function.
             if (t.GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, null,
                     new[] { typeof(string), typeof(NumberStyles), typeof(IFormatProvider) }, null) != null)
@@ -468,6 +577,10 @@ namespace WebShard.Serialization
                         typeof (Dictionary<,>).MakeGenericType(args[0], args[1]), args[0], args[1]);
             }
 
+            if (t == typeof (object))
+            {
+                return typeof (JsonObjectDeserializer);
+            }
 
             return typeof (JsonObjectDeserializer<>).MakeGenericType(t);
 
@@ -488,38 +601,6 @@ namespace WebShard.Serialization
 
             return invokeMethod.Invoke(null, new object[] { tokenStream });
         }
-/*        internal object Deserialize(ref IEnumerator<Token> enumerator, Type resultType)
-        {
-            var token = enumerator.Current;
-            if (token.Type == TokenType.Number)
-                return JsonNumberDeserializer.Deserialize(ref enumerator, resultType);
-            if (resultType == typeof (string))
-            {
-                if(token.Type != TokenType.String && token.Type != TokenType.Identifier)
-                    throw new FormatException("Expected string or identifier.");
-                string value = token.Value;
-                if (token.Type == TokenType.String)
-                    value = value.Trim('"');
-                enumerator.MoveNext();
-                return value;
-            }
-            if (resultType == typeof (bool))
-            {
-                return JsonBoolDeserializer.Instance.Deserialize(ref enumerator);
-            }
-            if (token.Type == TokenType.LeftBracket && resultType.IsArray)
-            {
-                var elType = resultType.GetElementType();
-                var deserializerType = typeof (JsonArrayDeserializer<>).MakeGenericType(elType);
-                
-                var deserMethod = deserializerType.GetMethod("Deserialize", BindingFlags.Public | BindingFlags.Static, null,
-                    new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
-                return deserMethod.Invoke(null, new object [] { enumerator });
-            }
-            throw new NotImplementedException();
-        }*/
-
-        
 
         public T Deserialize<T>(string json)
         {
@@ -538,6 +619,11 @@ namespace WebShard.Serialization
             var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
 
             return invokeMethod.Invoke(null, new object[] {enumerator});
+        }
+
+        public object Deserialize(string json)
+        {
+            return Deserialize<object>(json);
         }
     }
 }
