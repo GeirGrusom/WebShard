@@ -529,7 +529,7 @@ namespace WebShard.Serialization
         }
     }
 
-    public class JsonDeserializer : IDeserializer
+    public class JsonDeserializer 
     {
         internal static readonly JsonDeserializer Instance = new JsonDeserializer();
 
