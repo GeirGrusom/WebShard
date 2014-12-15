@@ -1,11 +1,14 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using NSubstitute;
 using NUnit.Framework;
 using WebShard;
 using WebShard.Mvc;
+using WebShard.Serialization.Form;
 
 namespace UnitTests.Mvc
 {
@@ -55,9 +58,11 @@ namespace UnitTests.Mvc
             // Arrange
             var actionInvoker = new ActionInvoker(typeof (TestController));
             var controller = new TestController();
+            var request = Substitute.For<IHttpRequestContext>();
+            request.Body.Returns(new MemoryStream(Encoding.UTF8.GetBytes("Name=Foo&Value=Bar")));
 
             // Act
-            var result = (PostResponse<PostInput>)actionInvoker.Invoke(controller, new Dictionary<string, string> { { "action", "post" }}, "Name=Foo&Value=Bar");
+            var result = (PostResponse<PostInput>)actionInvoker.Invoke(controller, request, new Dictionary<string, string> { { "action", "post" }}, new FormRequestDeserializer());
 
             // Assert
             Assert.That(result.Value, Is.Not.Null);
@@ -73,7 +78,7 @@ namespace UnitTests.Mvc
             var controller = new TestController();
 
             // Act
-            var result = actionInvoker.Invoke(controller, new Dictionary<string, string> {{"action", "index"}});
+            var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(), new Dictionary<string, string> {{"action", "index"}});
 
             // Assert
             Assert.That(result, Is.InstanceOf<StatusResponse>());
@@ -87,7 +92,7 @@ namespace UnitTests.Mvc
             var controller = new TestController();
 
             // Act
-            var result = actionInvoker.Invoke(controller,
+            var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(),
                 new Dictionary<string, string> {{"action", "index"}, {"id", "404"}});
 
             // Assert

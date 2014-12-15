@@ -5,6 +5,7 @@ using System.Linq;
 using System.Text;
 using WebShard.Mvc;
 using WebShard.Serialization;
+using WebShard.Serialization.Form;
 using WebShard.Serialization.Json;
 
 namespace WebShard
@@ -33,7 +34,8 @@ namespace WebShard
             _filterRegistry = _container.CreateChildContainer();
             _deserializers = new Dictionary<string, IRequestDeserializer>
             {
-                {"application/json", new JsonRequestDeserializer()}
+                {"application/json", new JsonRequestDeserializer()},
+                {"application/x-www-form-urlencoded", new FormRequestDeserializer()}
             };
         }
 
@@ -99,20 +101,16 @@ namespace WebShard
                     requestContainer.Dispose();
                     return response;
                 }
-                string postValue;
-                if (requestContext.Method == HttpMethods.Post)
-                {
-                    var content = new byte[requestContext.Headers.ContentLength.GetValueOrDefault()];
-                    requestContext.Body.Read(content, 0, (int)requestContext.Headers.ContentLength.GetValueOrDefault());
-                    postValue = Encoding.UTF8.GetString(content);
-                }
-                else
-                    postValue = "";
+
                 var actionInvoker = new ActionInvoker(controller.GetType());
                 IResponse result;
                 try
                 {
-                    result = actionInvoker.Invoke(controller, routeValues, postValue);
+                    IRequestDeserializer deserializer;
+                    if (requestContext.Headers.ContentType != null && _deserializers.TryGetValue(requestContext.Headers.ContentType, out deserializer))
+                        result = actionInvoker.Invoke(controller, requestContext, routeValues, deserializer);
+                    else
+                        result = actionInvoker.Invoke(controller, requestContext, routeValues);
                 }
                 catch (HttpException ex)
                 {
