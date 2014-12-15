@@ -48,7 +48,25 @@ namespace UnitTests
             Assert.That(contents, Is.StringEnding("OK"));
         }
 
-        [Test, Ignore("WIP")]
+        public class Foo
+        {
+            private readonly string _value;
+            public string Value { get { return _value; } }
+
+            public Foo(string value)
+            {
+                _value = value;
+            }
+        }
+        public class DeserializeJsonTestController
+        {
+            public IResponse Index(Foo foo)
+            {
+                return new ContentResponse(foo.Value);       
+            }
+        }
+
+        [Test]
         public void ActionInvoker_WithJsonBody_DeserializesJson()
         {
             // Arrange
@@ -57,13 +75,20 @@ namespace UnitTests
             var headers = new HeaderCollection();
             request.Headers.Returns(headers);
             request.Uri.Returns(new Uri("http://test.com/"));
-            request.Headers.AcceptEncoding.Returns( new string[0]);
-            request.Body.Returns(new MemoryStream(Encoding.UTF8.GetBytes("{ \"Foo\": \"Bar\"}")));
+            headers.AcceptEncoding = new string[0];
+            headers.ContentType = "application/json";
+            request.Body.Returns(new MemoryStream(Encoding.UTF8.GetBytes("{ \"Value\": \"Bar\"}")));
+            app.ControllerRegistry.Register<DeserializeJsonTestController>();
+            app.RouteTable.Add("/", new { controller = "DeserializeJsonTest", action = "Index" });
 
             // Act
             var response = app.ProcessRequest(request);
 
             // Assert
+            var responseMemory = new MemoryStream();
+            response.WriteResponse(responseMemory);
+            var contents = Encoding.UTF8.GetString(responseMemory.ToArray());
+            Assert.That(contents, Is.StringEnding("Bar"));
         }
 
         [Test]
