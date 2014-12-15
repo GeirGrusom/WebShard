@@ -4,6 +4,8 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using WebShard.Mvc;
+using WebShard.Serialization;
+using WebShard.Serialization.Json;
 
 namespace WebShard
 {
@@ -15,7 +17,9 @@ namespace WebShard
         private readonly RouteTable _routeTable;
         private readonly IContainer _controllerRegistry;
         private readonly IContainer _filterRegistry;
+        private readonly IDictionary<string, IRequestDeserializer> _deserializers; 
 
+        public IDictionary<string, IRequestDeserializer> Deserializers { get { return _deserializers; } }
         public IContainer Container { get { return _container; } }
         public IRouteTable RouteTable { get { return _routeTable; } }
         public IContainer ControllerRegistry { get { return _controllerRegistry; } }
@@ -27,6 +31,10 @@ namespace WebShard
             _controllerRegistry = _container.CreateChildContainer();
             _routeTable = new RouteTable(_controllerRegistry);
             _filterRegistry = _container.CreateChildContainer();
+            _deserializers = new Dictionary<string, IRequestDeserializer>
+            {
+                {"application/json", new JsonRequestDeserializer()}
+            };
         }
 
 

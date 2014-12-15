@@ -26,7 +26,7 @@ namespace WebShard
 
         public string Accept { get { return this[HttpAccept]; } set { this[HttpAccept] = value; } }
         public string AcceptCharset { get { return this[HttpAcceptCharset]; } set { this[HttpAcceptCharset] = value; } }
-        public string[] AcceptEncoding { get { return (this[HttpAcceptEncoding] ?? "").Split(',').Select(s => s.Trim()).ToArray(); } set
+        public IEnumerable<string> AcceptEncoding { get { return (this[HttpAcceptEncoding] ?? "").Split(',').Select(s => s.Trim()).ToArray(); } set
         {
             this[HttpAcceptEncoding] = string.Join(", ", value);
         } }

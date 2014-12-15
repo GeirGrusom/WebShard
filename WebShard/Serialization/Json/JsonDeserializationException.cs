@@ -1,14 +1,10 @@
 ﻿using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Runtime.Serialization;
-using System.Text;
-using System.Threading.Tasks;
 
-namespace WebShard.Serialization
+namespace WebShard.Serialization.Json
 {
     [Serializable]
-    public class DeserializationException : Exception
+    public class JsonDeserializationException : Exception
     {
         private readonly int _lineNumber;
         private readonly int _column;
@@ -18,7 +14,7 @@ namespace WebShard.Serialization
         public int Column { get { return _column; } }
         public string Token { get { return _token; } }
 
-        internal DeserializationException(SerializationInfo info, StreamingContext context)
+        internal JsonDeserializationException(SerializationInfo info, StreamingContext context)
             : base(info, context)
         {
             _lineNumber = info.GetInt32("_lineNumber");
@@ -26,7 +22,7 @@ namespace WebShard.Serialization
             _token = info.GetString("_token");
         }
 
-        public DeserializationException(Token token, string message, Exception innerException)
+        public JsonDeserializationException(Token token, string message, Exception innerException)
             : base(message, innerException)
         {
             _lineNumber = token.Line;
@@ -34,7 +30,7 @@ namespace WebShard.Serialization
             _token = token.Value;
         }
 
-        public DeserializationException(Token token, string message)
+        public JsonDeserializationException(Token token, string message)
             : base(message)
         {
             _lineNumber = token.Line;
@@ -42,14 +38,14 @@ namespace WebShard.Serialization
             _token = token.Value;
         }
 
-        public DeserializationException(Token token, Exception innerException)
+        public JsonDeserializationException(Token token, Exception innerException)
             : this(token,
                 string.Format("There was an error deserializing the document in line {0} column {1} '{2}'.", token.Line,
                     token.Column, token.Value), innerException)
         {
         }
 
-        public DeserializationException(Token token)
+        public JsonDeserializationException(Token token)
             : this(token,
                 string.Format("There was an error deserializing the document in line {0} column {1} '{2}'.", token.Line,
                     token.Column, token.Value))

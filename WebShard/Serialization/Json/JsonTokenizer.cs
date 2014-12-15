@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace WebShard.Serialization
+namespace WebShard.Serialization.Json
 {
     public class JsonTokenizer : IEnumerable<Token>
     {

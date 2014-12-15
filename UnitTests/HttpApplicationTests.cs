@@ -48,6 +48,24 @@ namespace UnitTests
             Assert.That(contents, Is.StringEnding("OK"));
         }
 
+        [Test, Ignore("WIP")]
+        public void ActionInvoker_WithJsonBody_DeserializesJson()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var request = Substitute.For<IHttpRequestContext>();
+            var headers = new HeaderCollection();
+            request.Headers.Returns(headers);
+            request.Uri.Returns(new Uri("http://test.com/"));
+            request.Headers.AcceptEncoding.Returns( new string[0]);
+            request.Body.Returns(new MemoryStream(Encoding.UTF8.GetBytes("{ \"Foo\": \"Bar\"}")));
+
+            // Act
+            var response = app.ProcessRequest(request);
+
+            // Assert
+        }
+
         [Test]
         public void RouteController_NoMatch_ReturnsNotFound()
         {
