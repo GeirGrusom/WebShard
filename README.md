@@ -104,4 +104,4 @@ static class Program
 Known issues
 ============
 
-* JSON deserialization is not yet completed. In the future it is intended that you can replace the built-in JSON serializstion with JSON.NET if you so please.
+* There is little to no error-checking at this point. This is next on the TODO-list. Make sure an exception doesn't crash the entire server.
