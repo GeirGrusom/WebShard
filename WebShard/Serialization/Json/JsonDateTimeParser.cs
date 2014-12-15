@@ -19,7 +19,6 @@ namespace WebShard.Serialization.Json
         public static T Parse(string input)
         {
             throw new NotImplementedException();
-            return ParseDateTime(input);
         }
 
     }

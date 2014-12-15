@@ -6,33 +6,23 @@ using System.Runtime.Serialization;
 using System.Text;
 using System.Threading.Tasks;
 using WebShard.Serialization;
+using WebShard.Serialization.Json;
 
 namespace WebShard
 {
-    public sealed class JsonResponse : IResponse
+    public sealed class JsonResponse : JsonResponse<object>
     {
-        private readonly object _model;
-        private readonly ISerializer _serializer;
         public JsonResponse(object model)
-            : this(model, JsonSerializer.Instance)
+            : base(model)
         {
         }
+    }
 
-        public JsonResponse(object model, ISerializer serializer)
+    public class JsonResponse<T> : ObjectResponse<T>
+    {
+        public JsonResponse(T model)
+            : base(model, new JsonResponseSerializer())
         {
-            _model = model;
-            _serializer = serializer;
-        }
-
-        public object Model { get { return _model; }}
-        public void Write(IHttpRequestContext request, IHttpResponseContext context)
-        {
-            string text = _serializer.Serialize(_model);
-            using (var streamWriter = new StreamWriter(context.Response, Encoding.UTF8))
-            {
-                streamWriter.Write(text);
-            }
-            context.Headers.ContentType = "application/json";
         }
     }
 }

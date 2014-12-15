@@ -66,6 +66,77 @@ namespace UnitTests
             }
         }
 
+        public class NormalGetControllerReturnsOk
+        {
+            public IResponse Get()
+            {
+                return new ContentResponse("OK");
+            }
+        }
+
+        [Test]
+        public void ControllerExplicitlySet_Ok()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var req = Substitute.For<IHttpRequestContext>();
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Method.Returns("GET");
+            app.ControllerRegistry.Register<NormalGetControllerReturnsOk>();
+            req.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { controller = typeof(NormalGetControllerReturnsOk) });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            var responseMemory = new MemoryStream();
+            response.WriteResponse(responseMemory);
+            var contents = Encoding.UTF8.GetString(responseMemory.ToArray());
+            Assert.That(contents, Is.StringEnding("OK"));
+        }
+        
+
+        [Test]
+        public void FuncInvoke_InvokesTheFunc()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var req = Substitute.For<IHttpRequestContext>();
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IResponse>(() => new ContentResponse("OK")) });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            var responseMemory = new MemoryStream();
+            response.WriteResponse(responseMemory);
+            var contents = Encoding.UTF8.GetString(responseMemory.ToArray());
+            Assert.That(contents, Is.StringEnding("OK"));
+        }
+
+        [Test]
+        public void FuncInvoke_IHttpRequest_InvokesTheFunc()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var req = Substitute.For<IHttpRequestContext>();
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IHttpRequestContext, IResponse>(r => new ContentResponse("OK")) });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            var responseMemory = new MemoryStream();
+            response.WriteResponse(responseMemory);
+            var contents = Encoding.UTF8.GetString(responseMemory.ToArray());
+            Assert.That(contents, Is.StringEnding("OK"));
+        }
+
         [Test]
         public void ActionInvoker_WithJsonBody_DeserializesJson()
         {

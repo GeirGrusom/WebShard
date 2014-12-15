@@ -10,7 +10,7 @@ namespace WebShard.Routing
         private readonly Route _prototype;
         private readonly Regex _regex;
         private readonly List<string> _segments;
-        private readonly Dictionary<string, string> _defaults; 
+        private readonly Dictionary<string, object> _defaults; 
         private static readonly Regex MatchRegex = new Regex(@"
 {
 (?<Name>[A-Za-z_][A-Za-z0-9_]*)
@@ -38,13 +38,13 @@ namespace WebShard.Routing
             _regex = CreateRegex();
         }
 
-        private Dictionary<string, string> CreateDictionary(object value)
+        private Dictionary<string, object> CreateDictionary(object value)
         {
             var props = value.GetType().GetProperties();
-            return props.ToDictionary(x => x.Name, x => x.GetValue(value).ToString());
+            return props.ToDictionary(x => x.Name, x => x.GetValue(value));
         }
 
-        public bool Match(string input, out IDictionary<string, string> routeValues)
+        public bool Match(string input, out IDictionary<string, object> routeValues)
         {
             var match = _regex.Match(input);
             if (!match.Success)
@@ -53,14 +53,14 @@ namespace WebShard.Routing
                 return false;
             }
 
-            routeValues = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            routeValues = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
             foreach (var seg in _segments)
             {
                 if (match.Groups[seg].Success)
                     routeValues[seg] = System.Net.WebUtility.UrlDecode(match.Groups[seg].Value);
                 else
                 {
-                    string def;
+                    object def;
                     if(_defaults.TryGetValue(seg, out def))
                         routeValues[seg] = def;
                 }

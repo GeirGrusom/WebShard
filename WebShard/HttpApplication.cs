@@ -61,7 +61,7 @@ namespace WebShard
                 requestContainer.For<IHttpRequestContext>().Use(c => requestContext, Lifetime.Application);
                 requestContainer.For<IHttpResponseContext>().Use(c => response, Lifetime.Application);
 
-                IDictionary<string, string> routeValues;
+                IDictionary<string, object> routeValues;
                 var route = _routeTable.Match(SanitizePathAndQueryAndReturnPath(requestContext.Uri.PathAndQuery),
                     out routeValues);
 
@@ -75,51 +75,116 @@ namespace WebShard
                     return response;
                 }
 
-                if (!routeValues.ContainsKey("action"))
-                    routeValues["action"] = requestContext.Method;
 
-                string controllerName = routeValues["controller"];
-                var proxyControllerContainer = _controllerRegistry.CreateProxyContainer(requestContainer);
-
-                var controller = proxyControllerContainer.TryGet(controllerName + "Controller");
+                object controller;
+                object controllerType;
+                if (routeValues.TryGetValue("controller", out controllerType))
+                {
+                    var proxyControllerContainer = _controllerRegistry.CreateProxyContainer(requestContainer);
+                    if (controllerType is string || controllerType is Type)
+                    {
+                        if (controllerType is string)
+                            controller = proxyControllerContainer.TryGet((string) controllerType + "Controller");
+                        else
+                            controller = proxyControllerContainer.GetService((Type) controllerType);
+                    }
+                    else if (controllerType.GetType().IsGenericType &&
+                             controllerType.GetType().GetGenericTypeDefinition() == typeof (Func<>))
+                    {
+                        controller = ((Func<object>) controllerType)();
+                    }
+                    else if (controllerType.GetType().IsGenericType &&
+                             controllerType.GetType().GetGenericTypeDefinition() == typeof (Func<,>))
+                    {
+                        controller = ((Func<IHttpRequestContext, object>) controllerType)(requestContext);
+                    }
+                    else
+                        controller = null;
+                }
+                else
+                    controller = null;
 
                 // Not found
-                if (controller == null)
+                if (controller == null && routeValues.ContainsKey("action") && routeValues["action"] == null)
                 {
                     StatusResponse.NotFound.Write(requestContext, response);
                     return response;
                 }
 
+                if (!routeValues.ContainsKey("action"))
+                    routeValues["action"] = requestContext.Method;
+
+
                 var filterRegistryProxy = _filterRegistry.CreateProxyContainer(requestContainer);
                 var filters = filterRegistryProxy.GetAll<IRequestFilter>(recurse: false);
 
-                IResponse filterResponse = filters.Select(f => f.Process()).FirstOrDefault(r => r != null);
 
-                if (filterResponse != null)
-                {
-                    filterResponse.Write(requestContext, response);
-                    requestContainer.Dispose();
-                    return response;
-                }
-
-                var actionInvoker = new ActionInvoker(controller.GetType());
-                IResponse result;
                 try
                 {
-                    IRequestDeserializer deserializer;
-                    if (requestContext.Headers.ContentType != null && _deserializers.TryGetValue(requestContext.Headers.ContentType, out deserializer))
-                        result = actionInvoker.Invoke(controller, requestContext, routeValues, deserializer);
-                    else
-                        result = actionInvoker.Invoke(controller, requestContext, routeValues);
+                    IResponse filterResponse = filters.Select(f => f.Process()).FirstOrDefault(r => r != null);
+                    if (filterResponse != null)
+                    {
+                        filterResponse.Write(requestContext, response);
+                        requestContainer.Dispose();
+                        return response;
+                    }
                 }
-                catch (HttpException ex)
+                catch (Exception ex)
                 {
-                    var statusResponse = new StatusResponse(new Status(ex.StatusCode, ex.Message));
-                    statusResponse.Write(requestContext, response);
-                    return response;
+                    throw new NotImplementedException("Need error handling here.", ex);
                 }
+
+                
+                IResponse result;
+                object action;
+                if (!routeValues.TryGetValue("action", out action) && controller == null)
+                {
+                    result = StatusResponse.NotFound;
+                }
+                else
+                {
+                    if (action is string && controller != null)
+                    {
+                        var actionInvoker = new ActionInvoker(controller.GetType());
+
+                        try
+                        {
+                            IRequestDeserializer deserializer;
+                            if (requestContext.Headers.ContentType != null &&
+                                _deserializers.TryGetValue(requestContext.Headers.ContentType, out deserializer))
+                                result = actionInvoker.Invoke(controller, requestContext, routeValues, deserializer);
+                            else
+                                result = actionInvoker.Invoke(controller, requestContext, routeValues);
+                        }
+                        catch (JsonDeserializationException)
+                        {
+                            StatusResponse.BadRequest.Write(requestContext, response);
+                            result = null;
+                        }
+                        catch (HttpException ex)
+                        {
+                            result = new StatusResponse(new Status(ex.StatusCode, ex.Message));
+                        }               
+                    }
+                    else
+                    {
+                        if (action is Func<IResponse>)
+                            result = ((Func<IResponse>) action)();
+                        else if (action is Func<IHttpRequestContext, IResponse>)
+                            result = ((Func<IHttpRequestContext, IResponse>) action)(requestContext);
+                        else
+                            throw new NotSupportedException(string.Format("The type '{0}' is not supprted as a action.",
+                                action.GetType()));
+                    }
+                }
+
                 if (result != null)
                     result.Write(requestContext, response);
+
+                else
+                {
+                    StatusResponse.NotFound.Write(requestContext, response);
+                }
 
             }
             return response;

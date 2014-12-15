@@ -68,6 +68,7 @@
     <Compile Include="IHttpRequestContext.cs" />
     <Compile Include="Ioc\Container.cs" />
     <Compile Include="Ioc\IContainer.cs" />
+    <Compile Include="ObjectResponse.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="RequestExceptionEventArgs.cs" />
     <Compile Include="Routing\QueryStringDeserializer.cs" />
@@ -89,6 +90,7 @@
     <Compile Include="Serialization\Json\JsonParseFormatProviderDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonParseNumberStylesFormatProviderDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonRequestDeserializer.cs" />
+    <Compile Include="Serialization\Json\JsonResponseSerializer.cs" />
     <Compile Include="Serialization\Json\JsonSerializer.cs" />
     <Compile Include="Serialization\Json\JsonStringDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonTokenizer.cs" />

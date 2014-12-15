@@ -24,7 +24,7 @@ namespace WebShard.Routing
             _matcher = new RouteMatcher(this);
         }
 
-        public bool Match(string url, out IDictionary<string, string> routeValues)
+        public bool Match(string url, out IDictionary<string, object> routeValues)
         {
             return _matcher.Match(url, out routeValues);
         }

@@ -10,7 +10,7 @@ namespace WebShard.Routing
         IReadOnlyList<Route> Routes { get; }
         void Add(string url, object defaults);
         void Add(Route route);
-        Route Match(string url, out IDictionary<string, string> routeValues);
+        Route Match(string url, out IDictionary<string, object> routeValues);
     }
 
     public class RouteTable : IRouteTable
@@ -36,7 +36,7 @@ namespace WebShard.Routing
             _routes.Add(route);
         }
 
-        public Route Match(string url, out IDictionary<string, string> routeValues)
+        public Route Match(string url, out IDictionary<string, object> routeValues)
         {
             foreach (var route in _routes)
             {

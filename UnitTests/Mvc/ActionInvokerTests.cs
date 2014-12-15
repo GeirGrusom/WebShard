@@ -62,7 +62,7 @@ namespace UnitTests.Mvc
             request.Body.Returns(new MemoryStream(Encoding.UTF8.GetBytes("Name=Foo&Value=Bar")));
 
             // Act
-            var result = (PostResponse<PostInput>)actionInvoker.Invoke(controller, request, new Dictionary<string, string> { { "action", "post" }}, new FormRequestDeserializer());
+            var result = (PostResponse<PostInput>)actionInvoker.Invoke(controller, request, new Dictionary<string, object> { { "action", "post" } }, new FormRequestDeserializer());
 
             // Assert
             Assert.That(result.Value, Is.Not.Null);
@@ -78,7 +78,7 @@ namespace UnitTests.Mvc
             var controller = new TestController();
 
             // Act
-            var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(), new Dictionary<string, string> {{"action", "index"}});
+            var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(), new Dictionary<string, object> { { "action", "index" } });
 
             // Assert
             Assert.That(result, Is.InstanceOf<StatusResponse>());
@@ -93,7 +93,7 @@ namespace UnitTests.Mvc
 
             // Act
             var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(),
-                new Dictionary<string, string> {{"action", "index"}, {"id", "404"}});
+                new Dictionary<string, object> { { "action", "index" }, { "id", "404" } });
 
             // Assert
             Assert.That(result, Is.InstanceOf<StatusResponse>());

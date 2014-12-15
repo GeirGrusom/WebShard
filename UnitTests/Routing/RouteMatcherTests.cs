@@ -15,7 +15,7 @@ namespace UnitTests.Routing
             var matcher = new RouteMatcher(route);
 
             // Act
-            IDictionary<string, string> result;
+            IDictionary<string, object> result;
             bool matched = matcher.Match("foo/bar/123", out result);
 
             // Assert
@@ -30,7 +30,7 @@ namespace UnitTests.Routing
             // Arrange
             var route = new Route(null, "/", new {controller = "Home"});
             var matcher = new RouteMatcher(route);
-            IDictionary<string, string> routeValues;
+            IDictionary<string, object> routeValues;
             // Act
             matcher.Match("/", out routeValues);
 
@@ -44,7 +44,7 @@ namespace UnitTests.Routing
             var route = new Route(null, "foo/{controller}/{action}", new {controller = "Default", action = "foo"});
             var matcher = new RouteMatcher(route);
 
-            IDictionary<string, string> result;
+            IDictionary<string, object> result;
             bool matched = matcher.Match("foo/test/index", out result);
 
             // Assert

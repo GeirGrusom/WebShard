@@ -2,6 +2,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.IO;
 using System.Linq;
 using System.Linq.Expressions;
 using System.Reflection;
@@ -15,6 +16,13 @@ namespace WebShard.Serialization
     {
         string Serialize(object input);
         string Serialize<T>(T input);
+    }
+
+    public interface IResponseSerializer
+    {
+        string ContentType { get; }
+        void Serialize(object input, Stream target);
+        void Serialize<T>(T input, Stream target);
     }
 
     internal sealed class ToStringSerializer : ISerializer

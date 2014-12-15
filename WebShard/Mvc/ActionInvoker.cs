@@ -9,8 +9,8 @@ namespace WebShard.Mvc
 {
     public interface IActionInvoker
     {
-        IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, string> routeValues, IRequestDeserializer deserializer);
-        IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, string> routeValues);
+        IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues, IRequestDeserializer deserializer);
+        IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues);
     }
     public class ActionInvoker : IActionInvoker
     {
@@ -29,14 +29,14 @@ namespace WebShard.Mvc
                 _methods.Where(m => string.Equals(x, m.Name, StringComparison.OrdinalIgnoreCase)).ToArray(), StringComparer.OrdinalIgnoreCase);
         }
 
-        public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, string> routeValues)
+        public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues)
         {
             return Invoke(controller, request, routeValues, null);
         }
 
-        public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, string> routeValues, IRequestDeserializer deserializer)
+        public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues, IRequestDeserializer deserializer)
         {
-            var methods = _methodLookup[routeValues["action"]];
+            var methods = _methodLookup[(string)routeValues["action"]];
 
             foreach (var m in methods.OrderByDescending(p => p.GetParameters().Length))
             {
@@ -70,7 +70,6 @@ namespace WebShard.Mvc
                         object result = m.Invoke(controller, invokeParameters);
                         return (IResponse)result;
                     }
-                    throw new NotImplementedException();
                 }
                 if (notMatchedParameters.Length == 0)
                 {
@@ -78,7 +77,7 @@ namespace WebShard.Mvc
                     return (IResponse)result;
                 }
             }
-            throw new NotImplementedException();
+            return null;
         }
     }
 }
