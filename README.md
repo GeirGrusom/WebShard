@@ -101,7 +101,33 @@ static class Program
 }
 ```
 
-Known issues
-============
+Minimalist example
+------------------
+```csharp
+static class Program
+{
+ static void Main()
+ {
+  var app = new HttpApplication();
+  app.RouteTable.Add("/", new { action = new Func<IResponse>(() => new ContentResponse("Hello World!")) })
+  new WebServer(app).Start();
+ }
+}
+```
+Advanced route configuration
+============================
 
-* There is little to no error-checking at this point. This is next on the TODO-list. Make sure an exception doesn't crash the entire server.
+Controller
+----------
+The controller key in the defaults object can be any of the following types:
+* `string`
+* `Func<object>`
+* `Func<IHttpRequest, object>`
+The Func versions can either return a controller instance or a controller type. Note that when using a controller type the controller must still be registered.
+
+Action
+------
+The action key in the defaults object can be any of the following types:
+* `string`
+* `Func<IResponse>`
+* `Func<IHttpRequest, IResponse>`
