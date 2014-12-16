@@ -1,13 +1,14 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 using NSubstitute;
 using NUnit.Framework;
 using WebShard;
+using WebShard.Filtering;
 using WebShard.Ioc;
+
+// ReSharper disable once ClassNeverInstantiated.Local
+// ReSharper disable once UnusedMember.Local
 
 namespace UnitTests
 {
@@ -95,6 +96,7 @@ namespace UnitTests
             Assert.That(response.Status.Code == 500);
         }
 
+        
         class ThrowingController
         {
             public IResponse Get()
@@ -123,6 +125,66 @@ namespace UnitTests
             Assert.That(response.Status.Code == 500);
             Assert.That(isExceptionEventRaised, Is.True);
         }
+
+        [Test]
+        public void ErrorFilter_Fails_ReturnsInternalServerError()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var request = Substitute.For<IHttpRequestContext>();
+            request.Headers.Returns(new HeaderCollection());
+            request.Uri.Returns(new Uri("http://www.example.com/"));
+            var errorFilter = Substitute.For<IExceptionFilter>();
+            errorFilter.WhenForAnyArgs(x => x.Process(null, null, null)).Do(x => { throw new FormatException(); });
+            app.FilterRegistry.For<IExceptionFilter>().Use(c => errorFilter);
+            app.RouteTable.Add("/", new Func<IResponse>(() => { throw new FormatException(); }));
+
+            // Act
+            var result = app.ProcessRequest(request);
+
+            // Assert
+            Assert.That(result.Status.Code, Is.EqualTo(500));
+        }
+
+        [Test]
+        public void Action_ReturnsStatusResponse_ResponseIsActionsErrorCode()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var request = Substitute.For<IHttpRequestContext>();
+            request.Uri.Returns(new Uri("http://www.example.com/"));
+            request.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IResponse>(() => StatusResponse.NotFound) });
+
+            // Act
+            var result = app.ProcessRequest(request);
+
+            // Assert
+            Assert.That(result.Status.Code, Is.EqualTo(404));
+            Assert.That(result.Status.Description, Is.EqualTo("Not found"));
+        }
+
+        [Test]
+        public void Action_ThrowsHttpException_ResponseIsExceptionErrorCode()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var request = Substitute.For<IHttpRequestContext>();
+            request.Uri.Returns(new Uri("http://www.example.com/"));
+            request.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IResponse>(() =>
+            {
+                throw new HttpException(Status.NotFound);
+            }) });
+
+            // Act
+            var result = app.ProcessRequest(request);
+
+            // Assert
+            Assert.That(result.Status.Code, Is.EqualTo(404));
+            Assert.That(result.Status.Description, Is.EqualTo("Not found"));
+        }
+
 
         [Test]
         public void Action_Fails_ReturnsInternalServerError()

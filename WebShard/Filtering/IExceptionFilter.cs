@@ -2,12 +2,12 @@
 
 namespace WebShard.Filtering
 {
-    interface IResponseFilter
+    public interface IResponseFilter
     {
         IResponse Process(IHttpRequestContext request, IHttpResponseContext response);
     }
 
-    interface IExceptionFilter
+    public interface IExceptionFilter
     {
         IResponse Process(IHttpRequestContext request, IHttpResponseContext response, Exception ex);
     }
