@@ -120,14 +120,14 @@ Advanced route configuration
 Controller
 ----------
 The controller key in the defaults object can be any of the following types:
-* string
-* Func<object>
-* Func<IHttpRequest, object>
+* `string`
+* `Func<object>`
+* `Func<IHttpRequest, object>`
 The Func versions can either return a controller instance or a controller type. Note that when using a controller type the controller must still be registered.
 
 Action
 ------
 The action key in the defaults object can be any of the following types:
-* string
-* Func<IResponse>
-* Func<IHttpRequest, IResponse>
+* `string`
+* `Func<IResponse>`
+* `Func<IHttpRequest, IResponse>`
