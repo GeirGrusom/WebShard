@@ -75,6 +75,74 @@ namespace UnitTests
         }
 
         [Test]
+        public void Filtering_Fails_ReturnsInternalServerError()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var req = Substitute.For<IHttpRequestContext>();
+            var filter = Substitute.For<IRequestFilter>();
+            filter.WhenForAnyArgs(x => x.Process()).Do(x =>  { throw new FormatException("Foobar"); });
+            app.FilterRegistry.Register(c => filter);
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Method.Returns("GET");
+            req.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IResponse>(() => new StatusResponse(Status.Ok) ) });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            Assert.That(response.Status.Code == 500);
+        }
+
+        class ThrowingController
+        {
+            public IResponse Get()
+            {
+                throw new FormatException();
+            }
+        }
+        [Test]
+        public void Controller_Fails_ReturnsInternalServerError()
+        {
+            // Arrange
+            bool isExceptionEventRaised = false;
+            var app = new HttpApplication();
+            app.ApplicationException += (application, ev) => isExceptionEventRaised = true;
+            var req = Substitute.For<IHttpRequestContext>();
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Method.Returns("GET");
+            req.Headers.Returns(new HeaderCollection());
+            app.ControllerRegistry.Register<ThrowingController>();
+            app.RouteTable.Add("/", new { controller = "Throwing" });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            Assert.That(response.Status.Code == 500);
+            Assert.That(isExceptionEventRaised, Is.True);
+        }
+
+        [Test]
+        public void Action_Fails_ReturnsInternalServerError()
+        {
+            // Arrange
+            var app = new HttpApplication();
+            var req = Substitute.For<IHttpRequestContext>();
+            req.Uri.Returns(new Uri("http://www.example.com/"));
+            req.Method.Returns("GET");
+            req.Headers.Returns(new HeaderCollection());
+            app.RouteTable.Add("/", new { action = new Func<IResponse>(() => { throw new FormatException(); }) });
+
+            // Act
+            var response = app.ProcessRequest(req);
+
+            // Assert
+            Assert.That(response.Status.Code == 500);
+        }
+
+        [Test]
         public void ControllerExplicitlySet_Ok()
         {
             // Arrange

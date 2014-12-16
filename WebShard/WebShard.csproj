@@ -45,6 +45,7 @@
     <Compile Include="CompositeResponse.cs" />
     <Compile Include="ContentResponse.cs" />
     <Compile Include="Filtering\BasicAuthorizationFilter.cs" />
+    <Compile Include="Filtering\IExceptionFilter.cs" />
     <Compile Include="HttpApplication.cs" />
     <Compile Include="HttpMethods.cs" />
     <Compile Include="HttpRequestContext.cs" />
