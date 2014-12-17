@@ -1,6 +1,7 @@
 ﻿using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Security.Cryptography.X509Certificates;
+using TestApplication;
 using WebShard.Filtering;
 using WebShard.Ioc;
 using WebShard.Routing;
@@ -48,8 +49,11 @@ namespace WebShard
 
             app.FilterRegistry.Register(c => new PasswordCredentials("foo", "bar"));
             app.FilterRegistry.Register<BasicAuthorizationFilter>();
+            app.FilterRegistry.For<IExceptionFilter>().Use<ErrorFilter>();
             app.ControllerRegistry.Register<TestController>();
+            app.ControllerRegistry.Register<ResourcesController>();
             app.RouteTable.Add("/{action?}", new { controller = "Test" });
+            app.RouteTable.Add(@"/{resourcePath:(css|js|fonts)}/{resourceName:[a-zA-Z][a-zA-Z0-9\.\-]*}", new { controller = "Resources" });
             
             app.Container.Register<UserRegistry>(Lifetime.Application);
             var server = new HttpWebServer(app);

@@ -19,14 +19,14 @@ namespace WebShard.Routing
 }(?<Slash>[/])?", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.ExplicitCapture | RegexOptions.IgnorePatternWhitespace);
         private Regex CreateRegex()
         {
-            string reg = MatchRegex.Replace(_prototype.Url,
+            string reg = "^" + MatchRegex.Replace(_prototype.Url,
                 e =>
                 {
                     _segments.Add(e.Groups["Name"].Value);
                     return "((?<" + e.Groups["Name"] + ">" +
                            (e.Groups["Regex"].Success ? e.Groups["Regex"].Value : "[^/]+") + (e.Groups["Slash"].Success ? ")/)" : "))") +
                            (e.Groups["Optional"].Success ? "?" : "");
-                });
+                }) + "/?$";
             return new Regex(reg, RegexOptions.Compiled | RegexOptions.Singleline);
         }
 

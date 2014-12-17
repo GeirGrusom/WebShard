@@ -48,7 +48,7 @@ namespace WebShard
             if (queryStart > 0)
                 input = input.Substring(0, queryStart);
 
-            if (!input.EndsWith("/"))
+            if (input.EndsWith("/"))
                 return input + "/";
 
             return input;
@@ -95,8 +95,12 @@ namespace WebShard
                     response = new HttpResponseContext(requestContext);
                     try
                     {
+                        
                         if (responseFilter != null)
-                            responseFilter.Process(requestContext, response, ex);
+                        {
+                            var renderResponse = responseFilter.Process(requestContext, response, ex);
+                            renderResponse.Write(requestContext, response);
+                        }
 
                         var exArgs = new ApplicationExceptionEventArgs(ex, requestContext, responseFilter != null);
                         OnApplicationException(exArgs);
@@ -207,9 +211,9 @@ namespace WebShard
                 return response;
             }
 
+            // If no route action is defined default to the HTTP verb.
             if (!routeValues.ContainsKey("action"))
                 routeValues["action"] = requestContext.Method;
-
 
             var filterRegistryProxy = _filterRegistry.CreateProxyContainer(requestContainer);
             var filters = filterRegistryProxy.GetAll<IRequestFilter>(recurse: false);
@@ -311,10 +315,21 @@ namespace WebShard
 
             try
             {
-                IRequestDeserializer deserializer;
-                if (requestContext.Headers.ContentType != null &&
-                    _deserializers.TryGetValue(requestContext.Headers.ContentType, out deserializer))
-                    result = actionInvoker.Invoke(controller, requestContext, routeValues, deserializer);
+                if (requestContext.Headers.ContentType != null)
+                {
+                    var sepIndex = requestContext.Headers.ContentType.IndexOf(';');
+                    string contentType;
+                    if (sepIndex > 0)
+                        contentType = requestContext.Headers.ContentType.Substring(0, sepIndex);
+                    else
+                        contentType = requestContext.Headers.ContentType;
+
+                    IRequestDeserializer deserializer;
+                    if(_deserializers.TryGetValue(contentType, out deserializer))
+                        result = actionInvoker.Invoke(controller, requestContext, routeValues, deserializer);
+                    else
+                        result = actionInvoker.Invoke(controller, requestContext, routeValues);
+                }
                 else
                     result = actionInvoker.Invoke(controller, requestContext, routeValues);
             }

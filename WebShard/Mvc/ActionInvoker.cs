@@ -36,7 +36,9 @@ namespace WebShard.Mvc
 
         public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues, IRequestDeserializer deserializer)
         {
-            var methods = _methodLookup[(string)routeValues["action"]];
+            MethodInfo[] methods;
+            if (!_methodLookup.TryGetValue((string) routeValues["action"], out methods))
+                return StatusResponse.NotFound;
 
             foreach (var m in methods.OrderByDescending(p => p.GetParameters().Length))
             {
@@ -77,7 +79,7 @@ namespace WebShard.Mvc
                     return (IResponse)result;
                 }
             }
-            return null;
+            return StatusResponse.NotFound;
         }
     }
 }
