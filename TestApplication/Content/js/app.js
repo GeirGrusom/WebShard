@@ -6,7 +6,6 @@ app.controller("testController", function($scope, $http) {
         postUser: { FirstName: '', LastName: '' },
         post: function() {
             $http.post('/', $scope.users.postUser).success(function(value) {
-                //$scope.users.list.push(value);
                 $scope.users.get();
             });
         },

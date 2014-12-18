@@ -23,6 +23,13 @@ namespace UnitTests.Serialization
         [TestCase(typeof(string), "Foo", "Foo")]
         [TestCase(typeof(bool), "true", true)]
         [TestCase(typeof(bool), "false", false)]
+        [TestCase(typeof(object), "null", null)]
+        [TestCase(typeof(object), "", null)]
+        [TestCase(typeof(string), "", null)]
+        [TestCase(typeof(string), "null", null)]
+        [TestCase(typeof(string), "\"\"", "")]
+        [TestCase(typeof(int?), "10", 10)]
+        [TestCase(typeof(int?), "null", null)]
         public void Deserialize_Primitives(Type deserializeType, string expression, object expectedResult)
         {
             // Arrange
@@ -171,5 +178,115 @@ namespace UnitTests.Serialization
             Assert.That(result, Is.EquivalentTo(new[] { 1, 2, 3, 4 }));
         }
 
+        public class ImmutableModel
+        {
+            private readonly string _value;
+
+            public string Value { get { return _value; } }
+
+            public ImmutableModel(string value)
+            {
+                _value = value;
+            }
+        }
+
+        [Test]
+        public void Deserialize_Object_UsingConstructorInjection()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<ImmutableModel>("{ \"Value\": \"Foo\" }");
+
+            // Assert
+            Assert.That(result.Value, Is.EqualTo("Foo"));
+        }
+
+        [Test]
+        public void Deserialize_Object_UsingConstructorInjection_MissingMember()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<ImmutableModel>("{ \"Not-Value-At-All\": \"Foo\" }"));
+
+            // Assert
+            Assert.That(result.Token, Is.EqualTo("\"Not-Value-At-All\""));
+        }
+
+        [Test]
+        public void Deserialize_Object_UsingConstructorInjection_Incomplete_FillsWithDefaults()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<ImmutableModel>("{ }");
+
+            // Assert
+            Assert.That(result.Value, Is.EqualTo(null)); // Token is the one From the start of the object.
+        }
+
+        public class MutableModel
+        {
+            public string Value { get; set; }
+        }
+
+        [Test]
+        public void Deserialize_Object_UsingWritableProperties_MissingLeftBrace_ThrowsJsonDeserializationException()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("[ \"Value\": \"Foo\" ]"));
+
+            // Assert
+            Assert.That(result.Token, Is.EqualTo("["));
+        }
+
+        [Test]
+        public void Deserialize_Object_UsingWritableProperties()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<MutableModel>("{ \"Value\": \"Foo\" }");
+
+            // Assert
+            Assert.That(result.Value, Is.EqualTo("Foo"));
+        }
+
+        public class MutableClassWithConstructor
+        {
+            private readonly string _immutableValue;
+            public string MutableValue { get; set; }
+            public string ImmutableValue { get { return _immutableValue; } }
+
+            public MutableClassWithConstructor()
+            {
+            }
+
+            public MutableClassWithConstructor(string immutableValue)
+            {
+                _immutableValue = immutableValue;
+            }
+        }
+
+        [Test]
+        public void Deserialize_Object_PrefersConstructorInjection()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<MutableClassWithConstructor>("{ \"ImmutableValue\": \"Foo\" }");
+
+            // Assert
+            Assert.That(result.ImmutableValue, Is.EqualTo("Foo"));
+        }
     }
 }

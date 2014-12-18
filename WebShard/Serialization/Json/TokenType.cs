@@ -2,6 +2,7 @@ namespace WebShard.Serialization.Json
 {
     public enum TokenType
     {
+        InvalidToken,
         Whitespace,
         Comment,
         Colon,

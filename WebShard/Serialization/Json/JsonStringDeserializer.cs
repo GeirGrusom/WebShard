@@ -13,6 +13,8 @@ namespace WebShard.Serialization.Json
                 result = token.Value.Substring(1, token.Value.Length - 2);
             else if (token.Type == TokenType.Identifier)
                 result = token.Value;
+            else if (token.Type == TokenType.Null)
+                result = null;
             else
                 throw new JsonDeserializationException(token);
             tokenStream.MoveNext();

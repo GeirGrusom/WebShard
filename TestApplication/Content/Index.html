@@ -13,7 +13,7 @@
     <body>
         <header><h4>Test application</h4></header>
         <div class="well-lg" ng-controller="testController">
-            <ul ng-repeat="user in users.list">
+            <ul ng-repeat="user in users.list" class="list-unstyled">
                 <li>{{user.FirstName}} {{user.LastName}}</li>
             </ul>
             <form class="form-group" ng-submit="users.post()">

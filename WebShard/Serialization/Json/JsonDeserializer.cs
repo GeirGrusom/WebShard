@@ -91,13 +91,41 @@ namespace WebShard.Serialization.Json
             return invokeMethod.Invoke(null, new object[] { tokenStream });
         }
 
+        private static class TypeDeserializerCache<T>
+        {
+            private static readonly DeserializeElement<T> DeserializeProc;
+            
+            static TypeDeserializerCache()
+            {
+                var type = GetDeserializer(typeof(T));
+            
+                var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
+
+                DeserializeProc = (DeserializeElement<T>)invokeMethod.CreateDelegate(typeof (DeserializeElement<T>));
+            }
+
+            public static T Deserialize(string json)
+            {
+                var tokens = new JsonTokenizer(json);
+                var enumerator = tokens.Where(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Comment).GetEnumerator();
+                if (!enumerator.MoveNext())
+                    return default(T);
+                return DeserializeProc(ref enumerator);
+            }
+        }
+
         public T Deserialize<T>(string json)
         {
-            return (T)Deserialize(json, typeof (T));
+            return TypeDeserializerCache<T>.Deserialize(json);
         }
 
         public object Deserialize(string json, Type resultType)
         {
+            if(json == null)
+                throw new ArgumentNullException("json");
+            if (resultType == null)
+                throw new ArgumentNullException("resultType");
+
             var tokens = new JsonTokenizer(json);
             var enumerator = tokens.Where(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Comment).GetEnumerator();
             if (!enumerator.MoveNext())
