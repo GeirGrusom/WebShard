@@ -106,11 +106,6 @@ namespace WebShard.Serialization.Json
 
         private static Expression IfNotAssignedSetDefault(ParameterExpression parameter, string fieldName, Expression isNotSet, Expression defaultValue)
         {
-            var argumentExceptionCtor = typeof(ArgumentException).GetConstructor(new[] { typeof(string), typeof(string) });
-            if (defaultValue == null)
-                return Expression.IfThen(isNotSet,
-                    Expression.Assign(parameter, Expression.Default(parameter.Type)));
-                    //Expression.Throw(Expression.New(argumentExceptionCtor, Expression.Constant(string.Format("The mandatory field '{0}' was not present in the document.", fieldName)), Expression.Constant(fieldName))));
             return Expression.IfThen(isNotSet, Expression.Assign(parameter, defaultValue));
         }
 
@@ -121,7 +116,7 @@ namespace WebShard.Serialization.Json
             {
                 results[i] = IfNotAssignedSetDefault(input[i], parameters[i].Name,
                     Expression.Not(Expression.ArrayIndex(variableSet, Expression.Constant(i))),
-                    parameters[i].HasDefaultValue ? Expression.Constant(parameters[i].DefaultValue) : null);
+                    parameters[i].HasDefaultValue ? Expression.Constant(parameters[i].DefaultValue) : (Expression)Expression.Default(parameters[i].ParameterType));
             }
             return Expression.Block(results);
         }
@@ -164,6 +159,11 @@ namespace WebShard.Serialization.Json
                 Expression.Call(stringDeserializeMethod, input));
                 
             var exit = Expression.Label(typeof (T), "exit");
+            var emptyObject = Expression.Label(typeof (void), "emptyObject");
+            var ifIsRightBraceGotoEmptyObject =
+                Expression.IfThen(
+                    Expression.Equal(currentTokenType, Expression.Constant(TokenType.RightBrace, typeof (TokenType))),
+                    Expression.Goto(emptyObject));
             var continueIfComma =
                 Expression.IfThen(
                     Expression.Equal(currentTokenType,
@@ -188,11 +188,13 @@ namespace WebShard.Serialization.Json
 
                     Expression.Label(loop), 
                     moveNext,
+                    ifIsRightBraceGotoEmptyObject,
                     getName,
                     throwIfNotColon,
                     moveNext,
                     variableCheckChain,
                     continueIfComma,
+                    Expression.Label(emptyObject),
                     throwIfNotRightBrace,
                     assignDefaultValueIfNotSet,
                     Expression.Label(exit, Expression.New(ctor, variables.Cast<Expression>()))
