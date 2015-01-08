@@ -210,10 +210,10 @@ namespace UnitTests.Serialization
             var json = new JsonDeserializer();
 
             // Act
-            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<ImmutableModel>("{ \"Not-Value-At-All\": \"Foo\" }"));
+            var result = json.Deserialize<ImmutableModel>("{ \"Not-Value-At-All\": \"Foo\" }");
 
             // Assert
-            Assert.That(result.Token, Is.EqualTo("\"Not-Value-At-All\""));
+            Assert.That(result.Value == default(string));
         }
 
         [Test]

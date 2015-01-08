@@ -72,16 +72,24 @@ namespace WebShard.Serialization.Json
                 Expression.Call(compareMethod, left, right, Expression.Constant(StringComparison.OrdinalIgnoreCase));
         }
 
-        private static Expression CreateIfThen(ParameterExpression variable, Expression variableSet, Expression name, Expression doParse, Expression elseIf)
+        private static Expression CreateSkip(ParameterExpression tokenStream)
+        {
+            var method = typeof (JsonObjectDeserializer<T>).GetMethod("Skip",
+                BindingFlags.Static | BindingFlags.NonPublic);
+
+            return Expression.Call(method, tokenStream);
+        }
+
+        private static Expression CreateIfThen(ParameterExpression tokenStream, ParameterExpression variable, Expression variableSet, Expression name, Expression doParse, Expression elseIf)
         {
             var assignParse = Expression.Assign(variable, doParse);
             var assignTrue = Expression.Assign(variableSet, Expression.Constant(true, typeof (bool)));
-            if(elseIf != null)
+            if (elseIf != null)
                 return Expression.IfThenElse(CompareToToken(name, Expression.Constant(variable.Name)),
                     Expression.Block(assignParse, assignTrue), elseIf);
-                
-            return Expression.IfThen(CompareToToken(name, Expression.Constant(variable.Name)),
-                Expression.Block(assignParse, assignTrue));
+
+            return Expression.IfThenElse(CompareToToken(name, Expression.Constant(variable.Name)),
+                Expression.Block(assignParse, assignTrue), CreateSkip(tokenStream));
         }
 
         private static Expression CreateParseExpression(Type type, ParameterExpression tokenStream)
@@ -93,16 +101,14 @@ namespace WebShard.Serialization.Json
 
         private static Expression CreateIfThenChain(IList<ParameterExpression> input, Expression variableSet, ParameterExpression tokenStream, Expression nameVariable)
         {
-            var expression = CreateIfThen(input[input.Count - 1], Expression.ArrayAccess(variableSet, Expression.Constant(input.Count - 1, typeof(int))), nameVariable, CreateParseExpression(input[input.Count - 1].Type, tokenStream), null);
+            var expression = CreateIfThen(tokenStream, input[input.Count - 1], Expression.ArrayAccess(variableSet, Expression.Constant(input.Count - 1, typeof(int))), nameVariable, CreateParseExpression(input[input.Count - 1].Type, tokenStream), null);
             for (int i = input.Count - 2; i >= 0; i--)
             {
-                expression = CreateIfThen(input[i], Expression.ArrayIndex(variableSet, Expression.Constant(i, typeof(int))), nameVariable, CreateParseExpression(nameVariable.Type, tokenStream),
+                expression = CreateIfThen(tokenStream, input[i], Expression.ArrayAccess(variableSet, Expression.Constant(i, typeof(int))), nameVariable, CreateParseExpression(nameVariable.Type, tokenStream),
                     expression);
             }
             return expression;
         }
-
-
 
         private static Expression IfNotAssignedSetDefault(ParameterExpression parameter, string fieldName, Expression isNotSet, Expression defaultValue)
         {
@@ -121,6 +127,36 @@ namespace WebShard.Serialization.Json
             return Expression.Block(results);
         }
 
+        private static void Skip(ref IEnumerator<Token> tokenStream)
+        {
+            if (tokenStream.Current.Type == TokenType.LeftBracket)
+            {
+                int count = 1;
+                while (count > 0 && tokenStream.MoveNext())
+                {
+                    if (tokenStream.Current.Type == TokenType.LeftBracket)
+                        count++;
+                    else if (tokenStream.Current.Type == TokenType.RightBracket)
+                        count--;
+                }
+                tokenStream.MoveNext();
+            }
+            else if (tokenStream.Current.Type == TokenType.LeftBrace)
+            {
+                int count = 1;
+                while (count > 0 && tokenStream.MoveNext())
+                {
+                    if (tokenStream.Current.Type == TokenType.LeftBrace)
+                        count++;
+                    else if (tokenStream.Current.Type == TokenType.RightBrace)
+                        count--;
+                }
+                tokenStream.MoveNext();
+            }
+            else
+                tokenStream.MoveNext();
+        }
+
         private static DeserializeElement<T> CreateConstructorInjector(ConstructorInfo ctor)
         {
             var pars = ctor.GetParameters().OrderBy(p => p.Position).ToArray();
@@ -128,6 +164,7 @@ namespace WebShard.Serialization.Json
             var variables = pars.Select(x => Expression.Variable(x.ParameterType, x.Name)).ToArray();
             var startToken = Expression.Variable(typeof (Token), "$startToken");
             var memberName = Expression.Variable(typeof (string), "$memberName");
+            var nameToken = Expression.Variable(typeof (Token), "$memberNameToken");
             var input = Expression.Parameter(typeof (IEnumerator<Token>).MakeByRefType(), "$input");
             var jsonDeserExc = typeof (JsonDeserializationException).GetConstructor(new[] {typeof (Token), typeof(string)});
             var moveNextMethod = typeof (IEnumerator).GetMethod("MoveNext");
@@ -157,7 +194,7 @@ namespace WebShard.Serialization.Json
                 null);
             var getName = Expression.Assign(memberName,
                 Expression.Call(stringDeserializeMethod, input));
-                
+            var setMemberNameToken = Expression.Assign(nameToken, currentToken);
             var exit = Expression.Label(typeof (T), "exit");
             var emptyObject = Expression.Label(typeof (void), "emptyObject");
             var ifIsRightBraceGotoEmptyObject =
@@ -179,7 +216,7 @@ namespace WebShard.Serialization.Json
                     Expression.Throw(Expression.New(jsonDeserExc, currentToken, Expression.Constant("Expected '}'"))));
 
             var lambda = Expression.Lambda<DeserializeElement<T>>(
-                Expression.Block(variables.Concat(new[] {memberName, variablesSet, startToken}),
+                Expression.Block(variables.Concat(new[] {memberName, variablesSet, startToken, nameToken}),
                     Expression.Assign(startToken, Expression.Property(input, "Current")),
                     throwIfNotLeftBrace,
                     Expression.Assign(variablesSet,
@@ -189,6 +226,7 @@ namespace WebShard.Serialization.Json
                     Expression.Label(loop), 
                     moveNext,
                     ifIsRightBraceGotoEmptyObject,
+                    setMemberNameToken,
                     getName,
                     throwIfNotColon,
                     moveNext,
