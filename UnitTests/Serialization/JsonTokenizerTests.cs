@@ -33,6 +33,7 @@ namespace UnitTests.Serialization
         [TestCase(TokenType.Number, "-.01")]
         [TestCase(TokenType.Number, "+.01")]
         [TestCase(TokenType.Whitespace, " ")]
+        [TestCase(TokenType.Whitespace, "     \r\n")]
         [TestCase(TokenType.Whitespace, "\t")]
         [TestCase(TokenType.Whitespace, "\r")]
         [TestCase(TokenType.Whitespace, "\n")]

@@ -80,7 +80,7 @@
     <Compile Include="Serialization\Form\FormDeserializer.cs" />
     <Compile Include="Serialization\Form\FormRequestDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonBoolDeserializer.cs" />
-    <Compile Include="Serialization\Json\JsonDateTimeParser.cs" />
+    <Compile Include="Serialization\Json\JsonDateTimeDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonDeserializationException.cs" />
     <Compile Include="Serialization\IRequestDeserializer.cs" />
     <Compile Include="Serialization\Json\JsonArrayDeserializer.cs" />

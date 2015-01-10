@@ -167,8 +167,8 @@ namespace WebShard.Serialization.Json
                         Expression.Assign(assignTo, CreateParseExpression(assignTo.Type, tokenStream)), @else);
 
             return
-                Expression.IfThen(CompareToToken(tokenName, Expression.Constant(propertyName, typeof(string))),
-                        Expression.Assign(assignTo, CreateParseExpression(assignTo.Type, tokenStream)));
+                Expression.IfThenElse(CompareToToken(tokenName, Expression.Constant(propertyName, typeof(string))),
+                        Expression.Assign(assignTo, CreateParseExpression(assignTo.Type, tokenStream)), CreateSkip(tokenStream));
 
         }
 

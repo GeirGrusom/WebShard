@@ -34,6 +34,9 @@ namespace WebShard.Serialization.Json
             if (t == typeof (string))
                 return typeof (JsonStringDeserializer);
 
+            if (t == typeof (DateTime))
+                return typeof (JsonDateTimeDeserializer);
+
             if (t.IsGenericType && t.GetGenericTypeDefinition() == typeof (Nullable<>))
                 return typeof (JsonNullableDeserializer<>).MakeGenericType(t.GetGenericArguments()[0]);
 

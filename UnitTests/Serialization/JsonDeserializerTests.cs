@@ -43,6 +43,19 @@ namespace UnitTests.Serialization
         }
 
         [Test]
+        public void Deserialize_DateTime()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<DateTime>("\"2000-01-01T14:00:00Z\"");
+
+            // Assert
+            Assert.That(result, Is.EqualTo(new DateTime(2000, 1, 1, 14, 0, 0, DateTimeKind.Utc)));
+        }
+
+        [Test]
         public void Deserialize_Struct()
         {
             // Arrange
@@ -260,6 +273,20 @@ namespace UnitTests.Serialization
             Assert.That(result.Value, Is.EqualTo("Foo"));
         }
 
+        [Test]
+        public void Deserialize_Object_UsingWritableProperties_UnknownFieldsAreIgnored()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<MutableModel>("{ \"Value\": \"Foo\", \"NotAValue\": \"Bar\" }");
+
+            // Assert
+            Assert.That(result.Value, Is.EqualTo("Foo"));
+        }
+
+
         public class MutableClassWithConstructor
         {
             private readonly string _immutableValue;
@@ -277,16 +304,16 @@ namespace UnitTests.Serialization
         }
 
         [Test]
-        public void Deserialize_Object_PrefersConstructorInjection()
+        public void Deserialize_Object_PrefersPropertyWriter()
         {
             // Arrange
             var json = new JsonDeserializer();
 
             // Act
-            var result = json.Deserialize<MutableClassWithConstructor>("{ \"ImmutableValue\": \"Foo\" }");
+            var result = json.Deserialize<MutableClassWithConstructor>("{ \"MutableValue\": \"Foo\" }");
 
             // Assert
-            Assert.That(result.ImmutableValue, Is.EqualTo("Foo"));
+            Assert.That(result.MutableValue, Is.EqualTo("Foo"));
         }
     }
 }
