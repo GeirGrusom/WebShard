@@ -19,10 +19,12 @@ namespace WebShard.Serialization.Json
             var ctor = ctors.OrderByDescending(c => c.GetParameters().Length).FirstOrDefault();
             if (ctor == null)
                 throw new TypeConstructionException(typeof(T), "The type does not have any public properties.");
-            if (ctor.GetParameters().Length == 0)
+
+            var anyWritableProperties = typeof (T).GetProperties().Any(p => p.CanWrite);
+
+            if (anyWritableProperties)
             {
-                // Do nothing for now.
-                deserProc = DeserializePropertySets;
+                deserProc = CreatePropertyWriter();
             }
             else
             {
@@ -30,7 +32,6 @@ namespace WebShard.Serialization.Json
             }
         }
 
-        // TODO: Write compiled version
         private static T DeserializePropertySets(ref IEnumerator<Token> tokenStream)
         {
             var result = Activator.CreateInstance<T>();
@@ -155,6 +156,111 @@ namespace WebShard.Serialization.Json
             }
             else
                 tokenStream.MoveNext();
+        }
+
+        private static Expression CreatePropertyIfThen(ParameterExpression tokenStream, Expression tokenName, string propertyName, Expression assignTo,
+            Expression @else)
+        {
+            if (@else != null)
+                return
+                    Expression.IfThenElse(CompareToToken(tokenName, Expression.Constant(propertyName, typeof (string))),
+                        Expression.Assign(assignTo, CreateParseExpression(assignTo.Type, tokenStream)), @else);
+
+            return
+                Expression.IfThen(CompareToToken(tokenName, Expression.Constant(propertyName, typeof(string))),
+                        Expression.Assign(assignTo, CreateParseExpression(assignTo.Type, tokenStream)));
+
+        }
+
+        private static Expression CreatePropertyIfChain(IDictionary<string, Expression> assignmentExpressions,
+            ParameterExpression tokenStream, ParameterExpression member)
+        {
+            var expression = CreatePropertyIfThen(tokenStream, member, assignmentExpressions.Keys.First(),
+                assignmentExpressions.Values.First(), null);
+
+            foreach (var item in assignmentExpressions.Skip(1))
+            {
+                expression = CreatePropertyIfThen(tokenStream, member, item.Key, item.Value, expression);
+            }
+
+            return expression;
+        }
+
+        private static DeserializeElement<T> CreatePropertyWriter()
+        {
+            var result = Expression.Variable(typeof (T), "result");
+            var pars = typeof (T).GetProperties().Where(p => p.CanWrite).ToArray();
+            var properties = pars.Select(x => Expression.Property(result, x)).ToDictionary(p => p.Member.Name, p => (Expression)p, StringComparer.OrdinalIgnoreCase);
+            var startToken = Expression.Variable(typeof(Token), "$startToken");
+            var memberName = Expression.Variable(typeof(string), "$memberName");
+            var nameToken = Expression.Variable(typeof(Token), "$memberNameToken");
+            var input = Expression.Parameter(typeof(IEnumerator<Token>).MakeByRefType(), "$input");
+            var jsonDeserExc = typeof(JsonDeserializationException).GetConstructor(new[] { typeof(Token), typeof(string) });
+            var moveNextMethod = typeof(IEnumerator).GetMethod("MoveNext");
+            var loop = Expression.Label(typeof(void), "Loop");
+            var currentTokenType = Expression.Property(Expression.Property(input, "Current"), "Type");
+            var currentToken = Expression.Property(input, "Current");
+            var variableCheckChain = CreatePropertyIfChain(properties, input, memberName);
+
+            if (jsonDeserExc == null)
+                throw new MissingMethodException("JsonDeserializationException", "ctor(Token, String)");
+            // if(input.Current.Type != TokenType.LeftBrace) 
+            //    throw new JsonDeserializationException($input.Current);
+
+            var throwIfNotLeftBrace = Expression.IfThen(
+                Expression.NotEqual(currentTokenType,
+                    Expression.Constant(TokenType.LeftBrace, typeof(TokenType))),
+                    Expression.Throw(Expression.New(jsonDeserExc, currentToken, Expression.Constant("Expected '{'."))));
+
+            var throwIfNotColon = Expression.IfThen(
+                Expression.NotEqual(currentTokenType,
+                    Expression.Constant(TokenType.Colon, typeof(TokenType))),
+                    Expression.Throw(Expression.New(jsonDeserExc, currentToken, Expression.Constant("Expected ':'."))));
+
+            var moveNext = Expression.Call(input, moveNextMethod);
+            var stringDeserializeMethod = typeof(JsonStringDeserializer).GetMethod("Deserialize",
+                BindingFlags.Public | BindingFlags.Static, null, new[] { typeof(IEnumerator<Token>).MakeByRefType() },
+                null);
+            var getName = Expression.Assign(memberName,
+                Expression.Call(stringDeserializeMethod, input));
+            var setMemberNameToken = Expression.Assign(nameToken, currentToken);
+            var exit = Expression.Label(typeof(T), "exit");
+            var emptyObject = Expression.Label(typeof(void), "emptyObject");
+            var ifIsRightBraceGotoEmptyObject =
+                Expression.IfThen(
+                    Expression.Equal(currentTokenType, Expression.Constant(TokenType.RightBrace, typeof(TokenType))),
+                    Expression.Goto(emptyObject));
+            var continueIfComma =
+                Expression.IfThen(
+                    Expression.Equal(currentTokenType,
+                        Expression.Constant(TokenType.Comma)), Expression.Goto(loop));
+
+            var throwIfNotRightBrace =
+                Expression.IfThen(
+                    Expression.NotEqual(currentTokenType, Expression.Constant(TokenType.RightBrace, typeof(TokenType))),
+                    Expression.Throw(Expression.New(jsonDeserExc, currentToken, Expression.Constant("Expected '}'"))));
+
+            var lambda = Expression.Lambda<DeserializeElement<T>>(
+                Expression.Block(new [] { result, memberName , startToken, nameToken },
+                    Expression.Assign(startToken, Expression.Property(input, "Current")),
+                    throwIfNotLeftBrace,
+                    Expression.Assign(result, Expression.New(typeof(T))),
+
+                    Expression.Label(loop),
+                    moveNext,
+                    ifIsRightBraceGotoEmptyObject,
+                    setMemberNameToken,
+                    getName,
+                    throwIfNotColon,
+                    moveNext,
+                    variableCheckChain,
+                    continueIfComma,
+                    Expression.Label(emptyObject),
+                    throwIfNotRightBrace,
+                    Expression.Label(exit, result)
+                    ),input);
+
+            return lambda.Compile();
         }
 
         private static DeserializeElement<T> CreateConstructorInjector(ConstructorInfo ctor)
