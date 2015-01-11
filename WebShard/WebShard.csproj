@@ -56,6 +56,7 @@
     <Compile Include="IRequestFilter.cs" />
     <Compile Include="IResponse.cs" />
     <Compile Include="JsonResponse.cs" />
+    <Compile Include="Mimetypes.cs" />
     <Compile Include="Mvc\ActionInvoker.cs" />
     <Compile Include="Mvc\ControllerAttribute.cs" />
     <Compile Include="FileSystemResponse.cs" />
