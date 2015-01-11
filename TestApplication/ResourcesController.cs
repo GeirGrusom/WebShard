@@ -11,7 +11,7 @@ namespace TestApplication
     {
         public IResponse Get(string resourceName, string resourcePath)
         {
-            return new FileSystemResponse("Content/" + resourcePath + "/" + resourceName, resourceName.EndsWith("js") ? "application/javascript" : "application/css", "utf-8");
+            return new FileSystemResponse("../../Content/" + resourcePath + "/" + resourceName, resourceName.EndsWith("js") ? "application/javascript" : "application/css", "utf-8");
         }
     }
 }

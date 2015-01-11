@@ -84,7 +84,7 @@ namespace WebShard
 
         public IResponse Get()
         {
-            return new FileSystemResponse(@".\Content\Index.html", "text/html", "utf-8");
+            return new FileSystemResponse(@"..\..\Content\Index.html", "text/html", "utf-8");
         }
     }
 }
