@@ -9,6 +9,13 @@ namespace WebShard.Serialization.Json
 {
     public class JsonTokenizer : IEnumerable<Token>
     {
+        private enum TryConsumeResult
+        {
+            Success,
+            Failed,
+            SyntaxError
+        }
+
         private readonly string _input;
         private char _currentValue;
         private int _position;
@@ -181,19 +188,6 @@ namespace WebShard.Serialization.Json
             return false;
         }
 
-        private bool TryConsumeRegex(string regex)
-        {
-            var reg = new Regex(regex, RegexOptions.Singleline);
-            var match = reg.Match(_input, _position);
-            if (match.Success)
-            {
-                for (int i = 0; i < match.Value.Length; i++)
-                    Consume();
-                return true;
-            }
-            return false;
-        }
-
         private bool TryConsumeWhitespace()
         {
             char ch;
@@ -252,8 +246,19 @@ namespace WebShard.Serialization.Json
             else
                 return false;
 
+            if (TryPeek(offset, out ch) && (ch == 'e' || ch == 'E'))
+            {
+                offset++;
+                if (TryPeek(offset, out ch) && (ch == '+' || ch == '-'))
+                    offset++;
+                while (TryPeek(offset, out ch) && char.IsDigit(ch))
+                    offset++;
+            }
+
             for (int i = 0; i < offset; i++)
                 Consume();
+
+
             return true;
         }
 
@@ -314,7 +319,12 @@ namespace WebShard.Serialization.Json
                 }
                 if (TryConsumeString())
                 {
-                    yield return EmitToken(TokenType.String);
+                    if (_currentValue == '"')
+                    {
+                        yield return EmitToken(TokenType.String);
+                        continue;
+                    }
+                    yield return EmitToken(TokenType.InvalidToken);
                     continue;
                 }
                 if (TryConsumeConstant("null"))

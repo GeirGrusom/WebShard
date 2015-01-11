@@ -32,6 +32,9 @@ namespace UnitTests.Serialization
         [TestCase(TokenType.Number, "+10.01")]
         [TestCase(TokenType.Number, "-.01")]
         [TestCase(TokenType.Number, "+.01")]
+        [TestCase(TokenType.Number, "1e2")]
+        [TestCase(TokenType.Number, "1e-2")]
+        [TestCase(TokenType.Number, "1e+2")]
         [TestCase(TokenType.Whitespace, " ")]
         [TestCase(TokenType.Whitespace, "     \r\n")]
         [TestCase(TokenType.Whitespace, "\t")]
@@ -51,6 +54,16 @@ namespace UnitTests.Serialization
             // Assert
             Assert.That(token.Type, Is.EqualTo(expectedTokenType));
             Assert.That(token.Value, Is.EqualTo(value));
+        }
+
+        [Test]
+        public void BrokenString_Fails()
+        {
+            // Arrange
+            var tokenizer = new JsonTokenizer("\"abc");
+
+            // Act
+            var token = tokenizer.Tokenize();
         }
 
         [Test]

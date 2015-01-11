@@ -17,7 +17,7 @@ namespace WebShard.Serialization.Json
             var tryParse = typeof(T).GetMethod("Parse", BindingFlags.Static | BindingFlags.Public, null,
                 new[] {typeof (string), typeof(NumberStyles), typeof (IFormatProvider)}, null);
             var lambda = Expression.Lambda<Func<string, T>>(
-                Expression.Call(null, tryParse, input, Expression.Constant(NumberStyles.Number), Expression.Constant(CultureInfo.InvariantCulture)), input
+                Expression.Call(null, tryParse, input, Expression.Constant(NumberStyles.Number | NumberStyles.AllowExponent), Expression.Constant(CultureInfo.InvariantCulture)), input
                 );
             Parse = lambda.Compile();
 

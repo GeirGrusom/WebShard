@@ -9,6 +9,8 @@ namespace WebShard.Serialization.Json
         {
             var token = tokenStream.Current;
             string result;
+            if(token.Type == TokenType.InvalidToken)
+                throw new JsonDeserializationException(token, "The value could not be parsed.");
             if (token.Type == TokenType.String)
                 result = token.Value.Substring(1, token.Value.Length - 2);
             else if (token.Type == TokenType.Identifier)

@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Numerics;
 using System.Text;
 using System.Threading.Tasks;
 using NUnit.Framework;
@@ -30,6 +31,9 @@ namespace UnitTests.Serialization
         [TestCase(typeof(string), "\"\"", "")]
         [TestCase(typeof(int?), "10", 10)]
         [TestCase(typeof(int?), "null", null)]
+        [TestCase(typeof(double), "10e2", 10.0e2)]
+        [TestCase(typeof(double), "10e2", 10.0e2)]
+        [TestCase(typeof(int), "10e2", (int)10e2)]
         public void Deserialize_Primitives(Type deserializeType, string expression, object expectedResult)
         {
             // Arrange
@@ -302,6 +306,105 @@ namespace UnitTests.Serialization
                 _immutableValue = immutableValue;
             }
         }
+
+        [Test]
+        public void Deserialize_BigInteger_Ok()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<BigInteger>("123");
+
+            // Assert
+            Assert.That(result, Is.EqualTo(new BigInteger(123)));
+        }
+
+        [Test]
+        public void Deserialize_BigInteger_WithExponent_Ok()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<BigInteger>("123e10");
+
+            // Assert
+            Assert.That(result, Is.EqualTo(new BigInteger(123e10)));
+        }
+
+
+        [Test]
+        public void Deserialize_IncompleteString_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<string>("\"abc"));
+        }
+
+        [Test]
+        public void Deserialize_IncompleteObject_MissingEndBrace_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("{ \"Value\": \"Foo\""));
+
+            // Assert
+
+        }
+
+        [Test]
+        public void Deserialize_IncompleteObject_MissingValue_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("{ \"Value\": "));
+
+            // Assert
+        }
+
+        [Test]
+        public void Deserialize_IncompleteObject_MissingValue_EndWithBrace_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("{ \"Value\": }"));
+
+            // Assert
+        }
+
+
+        [Test]
+        public void Deserialize_Object_NotAObject_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("[\"Foo\"]"));
+        }
+
+        [Test]
+        public void Deserialize_IncompleteObject_NonEndingString_Fails()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = Assert.Catch<JsonDeserializationException>(() => json.Deserialize<MutableModel>("{ \"Value: "));
+
+            // Assert
+        }
+
+
 
         [Test]
         public void Deserialize_Object_PrefersPropertyWriter()
