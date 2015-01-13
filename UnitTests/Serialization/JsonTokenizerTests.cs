@@ -42,7 +42,7 @@ namespace UnitTests.Serialization
         [TestCase(TokenType.Whitespace, "\n")]
         [TestCase(TokenType.Comment, "/* Foo bar */")]
         [TestCase(TokenType.Comment, "// Foo bar")]
-        [TestCase(TokenType.Identifier, "Foo-Bar_FizzBøzz")]
+        [TestCase(TokenType.Identifier, "Foo-Bar_FizzBuzz")]
         public void Tokenize_SingleTokens_Ok(TokenType expectedTokenType, string value)
         {
             // Aarrange

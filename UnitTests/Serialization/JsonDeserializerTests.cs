@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Numerics;
 using System.Text;
@@ -124,6 +125,62 @@ namespace UnitTests.Serialization
 
             // Assert
             Assert.That(result.Foo, Is.EqualTo("bar"));
+        }
+
+        public class Foo2
+        {
+            public string S0 { get; set; }
+            public string S1 { get; set; }
+            public string S2 { get; set; }
+            public string S3 { get; set; }
+            public string S4 { get; set; }
+            public string S5 { get; set; }
+            public string S6 { get; set; }
+            public string S7 { get; set; }
+            public string S8 { get; set; }
+            public string S9 { get; set; }
+
+            public decimal D0 { get; set; }
+            public decimal D1 { get; set; }
+            public decimal D2 { get; set; }
+            public decimal D3 { get; set; }
+            public decimal D4 { get; set; }
+            public decimal D5 { get; set; }
+            public decimal D6 { get; set; }
+            public decimal D7 { get; set; }
+            public decimal D8 { get; set; }
+            public decimal D9 { get; set; }
+
+            public static string CreateJson()
+            {
+                StringBuilder builder = new StringBuilder();
+                builder.AppendLine("{");
+                for (int i = 0; i < 10; i++)
+                {
+                    builder.AppendLine("\tD" + i + ": 5000000,");
+                    builder.AppendLine("\tS" + i + ": \"" + Guid.NewGuid() + "\"" + (i < 9 ? "," : ""));
+                }
+                builder.AppendLine("}");
+                return builder.ToString();
+            }
+
+        }
+
+        [Test]
+        public void SpeedTest()
+        {
+            string v = Foo2.CreateJson();
+
+            var deserializer = new JsonDeserializer();
+            var foo = deserializer.Deserialize<Foo2>(v);
+
+            var stp = Stopwatch.StartNew();
+            for (int i = 0; i < 100000; i++)
+            {
+                deserializer.Deserialize<Foo2>(v);
+            }
+            stp.Stop();
+            Console.WriteLine(stp.ElapsedTicks / (double)Stopwatch.Frequency);
         }
 
         [Test]

@@ -97,11 +97,11 @@ namespace WebShard.Serialization.Json
         private static class TypeDeserializerCache<T>
         {
             private static readonly DeserializeElement<T> DeserializeProc;
-            
+
             static TypeDeserializerCache()
             {
                 var type = GetDeserializer(typeof(T));
-            
+
                 var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
 
                 DeserializeProc = (DeserializeElement<T>)invokeMethod.CreateDelegate(typeof (DeserializeElement<T>));
@@ -110,7 +110,9 @@ namespace WebShard.Serialization.Json
             public static T Deserialize(string json)
             {
                 var tokens = new JsonTokenizer(json);
-                var enumerator = tokens.Where(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Comment).GetEnumerator();
+                var enumerator = tokens.Tokenize()
+                        .Where(t => t.Type != TokenType.Whitespace && t.Type != TokenType.Comment)
+                        .GetEnumerator();
                 if (!enumerator.MoveNext())
                     return default(T);
                 return DeserializeProc(ref enumerator);
@@ -135,7 +137,7 @@ namespace WebShard.Serialization.Json
                 return null;
 
             var type = GetDeserializer(resultType);
-            
+
             var invokeMethod = type.GetMethod("Deserialize", BindingFlags.Static | BindingFlags.Public, null, new[] {typeof (IEnumerator<Token>).MakeByRefType()}, null);
 
             return invokeMethod.Invoke(null, new object[] {enumerator});

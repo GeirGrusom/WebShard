@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
-using System.Text;
 using WebShard.Filtering;
 using WebShard.Mvc;
 using WebShard.Serialization;
@@ -95,7 +93,6 @@ namespace WebShard
                     response = new HttpResponseContext(requestContext);
                     try
                     {
-                        
                         if (responseFilter != null)
                         {
                             var renderResponse = responseFilter.Process(requestContext, response, ex);

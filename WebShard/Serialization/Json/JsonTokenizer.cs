@@ -36,93 +36,94 @@ namespace WebShard.Serialization.Json
             _startColumn = 1;
         }
 
-        private bool TryRead()
+        private void Read()
         {
-            if (_position + 1 > _input.Length)
-                return false;
-
-            if (_currentValue == '\n')
+            unchecked
             {
-                _currentLine++;
-                _currentColumn = 0;
-            }
-            else
-                _currentColumn++;
+                if (_currentValue == '\n')
+                {
+                    _currentLine++;
+                    _currentColumn = 0;
+                }
+                else
+                    _currentColumn++;
 
-            _currentValue = _input[_position++];
-                
-            return true;
+                _currentValue = _input[_position];
+                _position++;
+            }
         }
 
         private void Consume()
         {
-            TryRead();
+            Read();
             _currentToken.Append(_currentValue);
         }
 
-        private void ConsumeWhile(Func<char, bool> exp)
+        private Token EmitToken(TokenType type, string value)
         {
-            char ch;
-            while (TryPeek(0, out ch) && exp(ch))
-                Consume();
-        }
-
-        private Token EmitToken(TokenType type)
-        {
-            var result = new Token(_startLine, _startColumn, _currentToken.ToString(), type);
+            var result = new Token(_startLine, _startColumn, value, type);
             _currentToken.Clear();
             _startColumn = _currentColumn;
             _startLine = _currentLine;
             return result;
         }
-
-        private static readonly char[] extraIdentifierChars = {'_', '-'};
-        private bool TryConsumeIdentifier()
+        private Token EmitToken(TokenType type)
         {
-            
-            char ch;
-            if (TryPeek(0, out ch) && char.IsLetter(ch) || extraIdentifierChars.Contains(ch))
-            {
-                Consume();
-                ConsumeWhile(c => char.IsLetterOrDigit(c) || extraIdentifierChars.Contains(c));
-                return true;
-            }
-            return false;
+            return EmitToken(type, _currentToken.ToString());
         }
 
-        private bool TryConsumeString()
+        private void ConsumeString()
         {
-            char ch;
-            if (TryPeek(0, out ch) && ch == '"')
+            bool lastWasSlash = false;
+            char ch1;
+            while (TryPeek(out ch1))
             {
-                Consume();
-                bool lastWasSlash = false;
-                char ch1;
-                while (TryPeek(0, out ch1))
+                if (!lastWasSlash)
                 {
-                    if (!lastWasSlash && ch1 == '\\')
+                    if (ch1 == '\\')
+                    {
                         lastWasSlash = true;
-                    else if (!lastWasSlash && ch1 == '\"')
+                        Consume();
+                        continue;
+                    }
+                    if (ch1 == '"')
+                    {
+                        Consume();
                         break;
-                    else
-                        lastWasSlash = false;
-                    Consume();
+                    }
                 }
+                else
+                    lastWasSlash = false;
                 Consume();
+            }
+        }
+
+        private bool TryPeek(out char value)
+        {
+            unchecked
+            {
+                if (_position >= _input.Length)
+                {
+                    value = default(char);
+                    return false;
+                }
+                value = _input[_position];
                 return true;
             }
-            return false;
         }
 
         private bool TryPeek(int offset, out char value)
         {
-            if (_position + offset >= _input.Length)
+            unchecked
             {
-                value = default(char);
-                return false;
+                if (_position + offset >= _input.Length)
+                {
+                    value = default(char);
+                    return false;
+                }
+                value = _input[_position + offset];
+                return true;
             }
-            value = _input[_position + offset];
-            return true;
         }
 
         private bool TryPeek(string constant)
@@ -166,79 +167,41 @@ namespace WebShard.Serialization.Json
             return false;
         }
 
-        private bool TryConsumeLineComment()
+        private bool TryConsumeNumber(char current)
         {
-            if (TryPeek("//"))
+            char ch = current;
+            if (ch == '-' || ch == '+')
             {
                 Consume();
+                if (!TryPeek(out ch))
+                    return false;
+            }
+            if (char.IsDigit(ch))
+            {
                 Consume();
-                char ch;
-                while (TryPeek(0, out ch) && ch != 'n')
-                {
-                    if (ch == '\r')
-                        TryRead();
-                    else
-                        Consume();
-                }
-                if (ch == '\n')
-                    TryRead();
-
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeWhitespace()
-        {
-            char ch;
-            if (TryPeek(0, out ch) && char.IsWhiteSpace(ch))
-            {
-                ConsumeWhile(Char.IsWhiteSpace);
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeConstant(string constant)
-        {
-            if (TryPeek(constant))
-            {
-                for (int i = 0; i < constant.Length; i++)
+                while (TryPeek(out ch) && char.IsDigit(ch))
                     Consume();
-                return true;
-            }
-            return false;
-        }
-
-        private bool TryConsumeNumber()
-        {
-            char ch;
-            int offset = 0;
-            if (TryPeek(0, out ch) && (ch == '-' || ch == '+'))
-                offset++;
-            if (TryPeek(offset, out ch) && char.IsDigit(ch))
-            {
-                while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                    offset++;
-                if (TryPeek(offset, out ch) && ch == '.')
+                if (TryPeek(out ch) && ch == '.')
                 {
-                    offset++;
-                    if (TryPeek(offset, out ch) && char.IsDigit(ch))
+                    Consume();
+                    if (TryPeek(out ch) && char.IsDigit(ch))
                     {
-                        while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                            offset++;
+                        Consume();
+                        while (TryPeek(out ch) && char.IsDigit(ch))
+                            Consume();
                     }
                     else
                         return false;
                 }
             }
-            else if (TryPeek(offset, out ch) && ch == '.')
+            else if (ch == '.')
             {
-                offset++;
-                if (TryPeek(offset, out ch) && char.IsDigit(ch))
+                Consume();
+                if (TryPeek(out ch) && char.IsDigit(ch))
                 {
-                    while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                        offset++;
+                    Consume();
+                    while (TryPeek(out ch) && char.IsDigit(ch))
+                        Consume();
                 }
                 else
                     return false;
@@ -246,18 +209,14 @@ namespace WebShard.Serialization.Json
             else
                 return false;
 
-            if (TryPeek(offset, out ch) && (ch == 'e' || ch == 'E'))
+            if (TryPeek(out ch) && (ch == 'e' || ch == 'E'))
             {
-                offset++;
-                if (TryPeek(offset, out ch) && (ch == '+' || ch == '-'))
-                    offset++;
-                while (TryPeek(offset, out ch) && char.IsDigit(ch))
-                    offset++;
-            }
-
-            for (int i = 0; i < offset; i++)
                 Consume();
-
+                if (TryPeek(out ch) && (ch == '+' || ch == '-'))
+                    Consume();
+                while (TryPeek(out ch) && char.IsDigit(ch))
+                    Consume();
+            }
 
             return true;
         }
@@ -266,59 +225,68 @@ namespace WebShard.Serialization.Json
         {
             while (_position < _input.Length)
             {
-                if (TryConsumeWhitespace())
+                char next;
+                if (!TryPeek(0, out next))
+                    break;
+                if(char.IsWhiteSpace(next))
                 {
+                    Consume();
+                    while(TryPeek(out next) && char.IsWhiteSpace(next))
+                        Consume();
                     yield return EmitToken(TokenType.Whitespace);
                     continue;
                 }
-                if (TryConsumeComment())
+                if (next == '-' || next == '+' || next == '.' || char.IsNumber(next))
                 {
-                    yield return EmitToken(TokenType.Comment);
-                    continue;
-                }
-                if (TryConsumeLineComment())
-                {
-                    yield return EmitToken(TokenType.Comment);
-                    continue;
-                }
-                if (TryConsumeNumber())
-                {
-                    yield return EmitToken(TokenType.Number);
-                    continue;
+                    if (TryConsumeNumber(next))
+                    {
+                        yield return EmitToken(TokenType.Number);
+                        continue;
+                    }
+                    yield return EmitToken(TokenType.InvalidToken);
+                    yield break;
                 }
 
-                if (TryConsumeConstant("{"))
+                if (next == '{')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.LeftBrace);
                     continue;
                 }
-                if (TryConsumeConstant("}"))
+                if (next == '}')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.RightBrace);
                     continue;
                 }
-                if (TryConsumeConstant("["))
+                if (next == '[')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.LeftBracket);
                     continue;
                 }
-                if (TryConsumeConstant("]"))
+                if (next == ']')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.RightBracket);
                     continue;
                 }
-                if (TryConsumeConstant(","))
+                if (next == ',')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.Comma);
                     continue;
                 }
-                if (TryConsumeConstant(":"))
+                if (next == ':')
                 {
+                    Consume();
                     yield return EmitToken(TokenType.Colon);
                     continue;
                 }
-                if (TryConsumeString())
+                if (next == '"')
                 {
+                    Consume();
+                    ConsumeString();
                     if (_currentValue == '"')
                     {
                         yield return EmitToken(TokenType.String);
@@ -327,27 +295,73 @@ namespace WebShard.Serialization.Json
                     yield return EmitToken(TokenType.InvalidToken);
                     continue;
                 }
-                if (TryConsumeConstant("null"))
+                if (char.IsLetter(next) | next == '_')
                 {
-                    yield return EmitToken(TokenType.Null);
+                    Consume();
+                    while(TryPeek(0, out next) && (char.IsLetterOrDigit(next) || next == '_' || next == '-'))
+                        Consume();
+
+                    string currentToken = _currentToken.ToString();
+                    switch (currentToken)
+                    {
+                        case "null":
+                            yield return EmitToken(TokenType.Null, currentToken);
+                            continue;
+                        case "true":
+                            yield return EmitToken(TokenType.True, currentToken);
+                            continue;
+                        case "false":
+                            yield return EmitToken(TokenType.False, currentToken);
+                            continue;
+                        default:
+                            yield return EmitToken(TokenType.Identifier, currentToken);
+                            continue;
+                    }
+                }
+                if (next == '/')
+                {
+
+                    Consume();
+                    if (!TryPeek(out next))
+                    {
+                        yield return EmitToken(TokenType.InvalidToken);
+                        break;
+                    }
+                    Consume();
+                    if (next == '/')
+                    {
+                        while (TryPeek(out next) && next != '\n')
+                            Consume();
+                        if (next == '\n')
+                            Consume();
+                    }
+
+                    if (next == '*')
+                    {
+                        while (true)
+                        {
+                            if (!TryPeek(out next))
+                                break;
+                            Consume();
+                            if (next == '*')
+                            {
+                                if(!TryPeek(out next))
+                                    break;
+                                if (next == '/')
+                                {
+                                    Consume();
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
+                    yield return EmitToken(TokenType.Comment);
                     continue;
                 }
-                if (TryConsumeConstant("false"))
-                {
-                    yield return EmitToken(TokenType.False);
-                    continue;
-                }
-                if (TryConsumeConstant("true"))
-                {
-                    yield return EmitToken(TokenType.True);
-                    continue;
-                }
-                if (TryConsumeIdentifier())
-                {
-                    yield return EmitToken(TokenType.Identifier);
-                    continue;
-                }
-                throw new FormatException(string.Format("Unexpected character '{0}' at line {1} character {2}.", _input[_position], _currentLine, _currentColumn));
+                throw new FormatException(string.Format("Unexpected character '{0}' at line {1} character {2}.",
+                        _input[_position], _currentLine, _currentColumn));
+
             }
             _currentLine = 1;
             _startLine = 1;
