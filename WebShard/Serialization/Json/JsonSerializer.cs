@@ -35,7 +35,7 @@ namespace WebShard.Serialization
 
         public string Serialize<T>(T input)
         {
-            throw new NotSupportedException();
+            return Serialize((object) input);
         }
     }
 
@@ -133,6 +133,21 @@ namespace WebShard.Serialization
         }
     }
 
+    public class EnumSerializer : ISerializer
+    {
+        public static readonly EnumSerializer Instance = new EnumSerializer();
+
+        public string Serialize(object input)
+        {
+            return Serialize<object>(input);
+        }
+
+        public string Serialize<T>(T input)
+        {
+            return '"' + ToStringSerializer.Instance.Serialize(input) + '"';
+        }
+    }
+
     public class ObjectSerializer : ISerializer
     {
         public static readonly ObjectSerializer Instance = new ObjectSerializer();
@@ -194,7 +209,7 @@ namespace WebShard.Serialization
             }
 
             if (type.IsEnum)
-                return ToStringSerializer.Instance.Serialize(input);
+                return EnumSerializer.Instance.Serialize(input);
 
             ISerializer primitiveSerializer;
             if (PrimitiveSerializers.TryGetValue(type, out primitiveSerializer))
