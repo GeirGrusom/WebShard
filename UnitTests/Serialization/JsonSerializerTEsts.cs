@@ -16,7 +16,7 @@ namespace UnitTests.Serialization
         {
             Foo = 1
         }
-        [Test]
+        
         [TestCase(1, "1")]
         [TestCase(true, "true")]
         [TestCase(false, "false")]
@@ -32,6 +32,19 @@ namespace UnitTests.Serialization
 
             // Assert
             Assert.That(output, Is.EqualTo(result));
+        }
+
+        [Test]
+        public void SerializeDecimal()
+        {
+            // Arrange
+            var json = new JsonSerializer();
+
+            // Act
+            var output = json.Serialize(1.0m);
+
+            // Assert
+            Assert.That(output, Is.EqualTo("1.0"));
         }
 
         [Test]

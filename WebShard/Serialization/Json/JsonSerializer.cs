@@ -30,6 +30,10 @@ namespace WebShard.Serialization
         public static readonly ToStringSerializer Instance = new ToStringSerializer();
         public string Serialize(object input)
         {
+            var formattable = input as IFormattable;
+            if (formattable != null)
+                return formattable.ToString(null, CultureInfo.InvariantCulture);
+
             return input.ToString();
         }
 
