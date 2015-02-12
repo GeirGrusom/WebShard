@@ -19,7 +19,13 @@ namespace WebShard.Routing
 }(?<Slash>[/])?", RegexOptions.Compiled | RegexOptions.Singleline | RegexOptions.ExplicitCapture | RegexOptions.IgnorePatternWhitespace);
         private Regex CreateRegex()
         {
-            string reg = "^" + MatchRegex.Replace(_prototype.Url,
+            string url;
+            if (!_prototype.Url.StartsWith("/"))
+                url = "/" + _prototype.Url;
+            else
+                url = _prototype.Url;
+
+            string reg = "^" + MatchRegex.Replace(url,
                 e =>
                 {
                     _segments.Add(e.Groups["Name"].Value);

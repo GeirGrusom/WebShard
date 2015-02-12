@@ -21,7 +21,6 @@ namespace UnitTests.Routing
             // Assert
             Assert.That(matched, Is.True);
             Assert.That(result["action"], Is.EqualTo("index"));
-            
         }
 
         [Test]
@@ -53,5 +52,34 @@ namespace UnitTests.Routing
             Assert.That(result["controller"], Is.EqualTo("test"));
             Assert.That(result["action"], Is.EqualTo("index"));
         }
+
+        [Test]
+        public void Constructor_AddsPrefixSlashIfMissing()
+        {
+            // Arrange
+            var route = new Route(null, "foo", new {});
+
+            // Act
+            var matcher = new RouteMatcher(route);
+
+            // Assert
+            IDictionary<string, object> care;
+            Assert.That(matcher.Match("/foo", out care));
+        }
+
+        [Test]
+        public void Constructor_DoesNotAddPrefixSlashIfItIsAlreadyThere()
+        {
+            // Arrange
+            var route = new Route(null, "/foo", new { });
+
+            // Act
+            var matcher = new RouteMatcher(route);
+
+            // Assert
+            IDictionary<string, object> care;
+            Assert.That(matcher.Match("/foo", out care));
+        }
+
     }
 }

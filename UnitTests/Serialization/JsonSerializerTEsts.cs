@@ -16,7 +16,7 @@ namespace UnitTests.Serialization
         {
             Foo = 1
         }
-        
+
         [TestCase(1, "1")]
         [TestCase(true, "true")]
         [TestCase(false, "false")]
