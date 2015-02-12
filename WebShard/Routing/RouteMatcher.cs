@@ -10,7 +10,7 @@ namespace WebShard.Routing
         private readonly Route _prototype;
         private readonly Regex _regex;
         private readonly List<string> _segments;
-        private readonly Dictionary<string, object> _defaults; 
+        private readonly Dictionary<string, object> _defaults;
         private static readonly Regex MatchRegex = new Regex(@"
 {
 (?<Name>[A-Za-z_][A-Za-z0-9_]*)
@@ -21,7 +21,7 @@ namespace WebShard.Routing
         {
             string url;
             if (!_prototype.Url.StartsWith("/"))
-                url = "/" + _prototype.Url;
+                url = "/?" + _prototype.Url;
             else
                 url = _prototype.Url;
 

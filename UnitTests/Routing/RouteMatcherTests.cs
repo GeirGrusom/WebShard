@@ -54,6 +54,19 @@ namespace UnitTests.Routing
         }
 
         [Test]
+        public void Match_TrailingSlash()
+        {
+            // Arrange
+            var route = new Route(null, "foo",new {});
+            var matcher = new RouteMatcher(route);
+
+            // Act
+            IDictionary<string, object> care;
+            Assert.That(matcher.Match("foo/", out care));
+
+        }
+
+        [Test]
         public void Constructor_AddsPrefixSlashIfMissing()
         {
             // Arrange
@@ -80,6 +93,5 @@ namespace UnitTests.Routing
             IDictionary<string, object> care;
             Assert.That(matcher.Match("/foo", out care));
         }
-
     }
 }
