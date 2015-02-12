@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Runtime.Remoting;
 using System.Text;
 using System.Threading.Tasks;
 using NSubstitute;
@@ -94,6 +95,24 @@ namespace UnitTests.Mvc
             // Act
             var result = actionInvoker.Invoke(controller, Substitute.For<IHttpRequestContext>(),
                 new Dictionary<string, object> { { "action", "index" }, { "id", "404" } });
+
+            // Assert
+            Assert.That(result, Is.InstanceOf<StatusResponse>());
+            Assert.That(((StatusResponse)result).Status.Code, Is.EqualTo(404));
+        }
+
+        [Test]
+        public void Invoke_IntArgument_FromQueryString()
+        {
+            // Arrange
+            var actionInvoker = new ActionInvoker(typeof (TestController));
+            var controller = new TestController();
+            var httpRequest = Substitute.For<IHttpRequestContext>();
+            httpRequest.QueryString.Returns(new Dictionary<string, string> {{"id", "404"}});
+
+            // Act
+            var result = actionInvoker.Invoke(controller, httpRequest,
+                new Dictionary<string, object> {{"action", "index"}});
 
             // Assert
             Assert.That(result, Is.InstanceOf<StatusResponse>());

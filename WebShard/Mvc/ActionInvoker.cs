@@ -40,12 +40,17 @@ namespace WebShard.Mvc
             if (!_methodLookup.TryGetValue((string) routeValues["action"], out methods))
                 return StatusResponse.NotFound;
 
+            var valueSet =
+                request.QueryString.Select(x => new KeyValuePair<string, object>(x.Key, x.Value))
+                    .Union(routeValues)
+                    .ToDictionary(x => x.Key, x => x.Value);
+
             foreach (var m in methods.OrderByDescending(p => p.GetParameters().Length))
             {
                 var parameters = m.GetParameters();
-                var notMatchedParameters = parameters.Where(p => !routeValues.ContainsKey(p.Name) && !p.HasDefaultValue).ToArray();
-                var matchedParameters = parameters.Where(p => routeValues.ContainsKey(p.Name)).ToDictionary(p => p, p => Convert.ChangeType(routeValues[p.Name], p.ParameterType));
-                var defaultParameters = parameters.Where(p => !routeValues.ContainsKey(p.Name) && p.HasDefaultValue).ToDictionary(p => p, p => p.DefaultValue);
+                var notMatchedParameters = parameters.Where(p => !valueSet.ContainsKey(p.Name) && !p.HasDefaultValue).ToArray();
+                var matchedParameters = parameters.Where(p => valueSet.ContainsKey(p.Name)).ToDictionary(p => p, p => Convert.ChangeType(valueSet[p.Name], p.ParameterType));
+                var defaultParameters = parameters.Where(p => !valueSet.ContainsKey(p.Name) && p.HasDefaultValue).ToDictionary(p => p, p => p.DefaultValue);
 
                 if (!notMatchedParameters.Any())
                 {
@@ -64,7 +69,7 @@ namespace WebShard.Mvc
                         var p = notMatchedParameters[0];
 
                         object value = deserializer.Deserialize(request.Body, p.ParameterType);
-                            
+
                         var values = new Dictionary<ParameterInfo, object>
                             {{ p, value }};
                         var invokeParameters = matchedParameters.Concat(defaultParameters).Concat(values).OrderBy(par => par.Key.Position).Select(par => par.Value).ToArray();
