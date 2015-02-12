@@ -23,7 +23,7 @@ namespace UnitTests.Serialization
         [TestCase(1.1234f, "1.1234")]
         [TestCase(1.12345, "1.12345")]
         [TestCase("Hello World!", "\"Hello World!\"")]
-        [TestCase(TestEnum.Foo, "Foo")]
+        [TestCase(TestEnum.Foo, "\"Foo\"")]
         public void SerializePrimitive(object input, string result)
         {
             var json = new JsonSerializer();
