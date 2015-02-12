@@ -2,6 +2,7 @@
 {
     public class StatusResponse : IResponse
     {
+        public static readonly StatusResponse Ok = new StatusResponse(Status.Ok);
         public static readonly StatusResponse NotFound = new StatusResponse(Status.NotFound);
         public static readonly StatusResponse BadRequest = new StatusResponse(Status.BadRequest);
         public static readonly StatusResponse Unauthorized = new StatusResponse(Status.Unauthorized);

@@ -13,12 +13,14 @@ namespace WebShard
         private readonly CancellationToken _cancelToken;
         private readonly bool _isSecure;
         private readonly IHttpWebServer _webServer;
+        private readonly CountdownEvent _counter;
 
-        public ClientProcess(TcpClient client, CancellationToken token, IHttpWebServer webServer, bool isSecure)
+        public ClientProcess(TcpClient client, CountdownEvent counter, CancellationToken token, IHttpWebServer webServer, bool isSecure)
         {
             _client = client;
             _cancelToken = token;
             _isSecure = isSecure;
+            _counter = counter;
             _webServer = webServer;
         }
 
@@ -46,10 +48,13 @@ namespace WebShard
 
                 while (_client.Connected && !_cancelToken.IsCancellationRequested)
                 {
-                    while (!netStream.DataAvailable)
+                    do
                     {
+                        if(!_client.Connected || _cancelToken.IsCancellationRequested)
+                            goto exitRead;
+
                         Thread.Sleep(0);
-                    }
+                    } while (!netStream.DataAvailable);
 
                     var request = HttpRequestContext.CreateFromStream(stream, _isSecure ? "https" : "http",
                         _client.Client.RemoteEndPoint.ToString());
@@ -61,6 +66,7 @@ namespace WebShard
                         break;
                 }
             }
+        exitRead:  _counter.Signal();
         }
     }
 }
