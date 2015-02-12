@@ -414,6 +414,20 @@ namespace UnitTests.Serialization
 
         }
 
+
+        [Test]
+        public void Deserialize_ObjectInArray()
+        {
+            // Arrange
+            var json = new JsonDeserializer();
+
+            // Act
+            var result = json.Deserialize<MutableModel[]>("[{\"Value\":\"Foo\"}]");
+
+            // Assert
+            Assert.That(result, Is.Not.Null);
+        }
+
         [Test]
         public void Deserialize_IncompleteObject_MissingValue_Fails()
         {

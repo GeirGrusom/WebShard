@@ -43,7 +43,6 @@ namespace WebShard.Serialization.Json
                 throw new FormatException("Expected ']'");
             tokenStream.MoveNext();
             return list.ToArray();
-            throw new NotImplementedException();
         }
     }
 }

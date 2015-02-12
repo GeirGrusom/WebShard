@@ -257,6 +257,7 @@ namespace WebShard.Serialization.Json
                     continueIfComma,
                     Expression.Label(emptyObject),
                     throwIfNotRightBrace,
+                    moveNext,
                     Expression.Label(exit, result)
                     ),input);
 
@@ -340,6 +341,7 @@ namespace WebShard.Serialization.Json
                     continueIfComma,
                     Expression.Label(emptyObject),
                     throwIfNotRightBrace,
+                    moveNext,
                     assignDefaultValueIfNotSet,
                     Expression.Label(exit, Expression.New(ctor, variables.Cast<Expression>()))
                     ), input);
