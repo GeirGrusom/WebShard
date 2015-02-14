@@ -47,6 +47,11 @@ namespace UnitTests.Mvc
                 return StatusResponse.NotFound;
             }
 
+            public IResponse Index(string action)
+            {
+                return new StatusResponse(new Status(200, action));
+            }
+
             public IResponse Post(PostInput value)
             {
                 return new PostResponse<PostInput> {Value = value};
@@ -117,6 +122,44 @@ namespace UnitTests.Mvc
             // Assert
             Assert.That(result, Is.InstanceOf<StatusResponse>());
             Assert.That(((StatusResponse)result).Status.Code, Is.EqualTo(404));
+        }
+
+        [Test]
+        public void Invoke_IntArgument_FromQueryString_CaseInsensitive()
+        {
+            // Arrange
+            var actionInvoker = new ActionInvoker(typeof(TestController));
+            var controller = new TestController();
+            var httpRequest = Substitute.For<IHttpRequestContext>();
+            httpRequest.QueryString.Returns(new Dictionary<string, string> { { "ID", "404" } });
+
+            // Act
+            var result = actionInvoker.Invoke(controller, httpRequest,
+                new Dictionary<string, object> { { "action", "index" } });
+
+            // Assert
+            Assert.That(result, Is.InstanceOf<StatusResponse>());
+            Assert.That(((StatusResponse)result).Status.Code, Is.EqualTo(404));
+        }
+
+        // Tests that a user cannot override route value provided entris
+        // However should this be the desired result?
+        [Test]
+        public void Invoke_IntArgument_RouteValueInQueryString_UsesRouteValue()
+        {
+            // Arrange
+            var actionInvoker = new ActionInvoker(typeof(TestController));
+            var controller = new TestController();
+            var httpRequest = Substitute.For<IHttpRequestContext>();
+            httpRequest.QueryString.Returns(new Dictionary<string, string> { { "action", "NotIndexAtAll" } });
+
+            // Act
+            var result = actionInvoker.Invoke(controller, httpRequest,
+                new Dictionary<string, object> { { "action", "index" } });
+
+            // Assert
+            Assert.That(result, Is.InstanceOf<StatusResponse>());
+            Assert.That(((StatusResponse)result).Status.Description, Is.EqualTo("index"));
         }
     }
 }

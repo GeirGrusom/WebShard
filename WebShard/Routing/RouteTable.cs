@@ -18,7 +18,7 @@ namespace WebShard.Routing
         private readonly IList<Route> _routes;
         private readonly IContainer _container;
 
-        public IReadOnlyList<Route> Routes { get { return new ReadOnlyCollection<Route>(_routes); } } 
+        public IReadOnlyList<Route> Routes { get { return new ReadOnlyCollection<Route>(_routes); } }
 
         public RouteTable(IContainer container)
         {

@@ -78,8 +78,13 @@ namespace WebShard
         public IResponse Post(Model model)
         {
             _userRegistry.AddUser(new User { FirstName = model.FirstName, LastName = model.LastName});
-            
+
             return new RedirectResponse("/");
+        }
+
+        public IResponse Test(string name, string action)
+        {
+            return new ContentResponse(name);
         }
 
         public IResponse Get()

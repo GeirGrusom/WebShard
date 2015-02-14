@@ -34,6 +34,21 @@ namespace WebShard.Mvc
             return Invoke(controller, request, routeValues, null);
         }
 
+        private class KeyValueStringEqualityComparer : IEqualityComparer<KeyValuePair<string, object>>
+        {
+            public static readonly KeyValueStringEqualityComparer Instance = new KeyValueStringEqualityComparer();
+
+            public bool Equals(KeyValuePair<string, object> x, KeyValuePair<string, object> y)
+            {
+                return string.Compare(x.Key, y.Key, StringComparison.OrdinalIgnoreCase) == 0;
+            }
+
+            public int GetHashCode(KeyValuePair<string, object> obj)
+            {
+                return obj.Key.ToLowerInvariant().GetHashCode();
+            }
+        }
+
         public IResponse Invoke(object controller, IHttpRequestContext request, IDictionary<string, object> routeValues, IRequestDeserializer deserializer)
         {
             MethodInfo[] methods;
@@ -41,9 +56,8 @@ namespace WebShard.Mvc
                 return StatusResponse.NotFound;
 
             var valueSet =
-                request.QueryString.Select(x => new KeyValuePair<string, object>(x.Key, x.Value))
-                    .Union(routeValues)
-                    .ToDictionary(x => x.Key, x => x.Value);
+                routeValues.Union(request.QueryString.Select(x => new KeyValuePair<string, object>(x.Key, x.Value)), KeyValueStringEqualityComparer.Instance)
+                    .ToDictionary(x => x.Key, x => x.Value, StringComparer.OrdinalIgnoreCase);
 
             foreach (var m in methods.OrderByDescending(p => p.GetParameters().Length))
             {
